@@ -1,10 +1,4 @@
 {
-  "pages": [
-    "index",
-    "get-started",
-    "styling",
-    "radix-shadcn-migration",
-    "roadmap"
-  ],
+  "pages": ["index", "get-started", "styling", "roadmap"],
   "title": "Overview"
 }

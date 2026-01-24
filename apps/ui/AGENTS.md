@@ -784,8 +784,7 @@ export default function Particle() {
 When creating a particle equivalent to an origin component:
 
 1. **Read the origin component** (`apps/origin/registry/default/ui/{component}.tsx`)
-2. **Check the migration guide** (`apps/ui/content/docs/(root)/radix-shadcn-migration.mdx`)
-3. **Compare the primitives:**
+2. **Compare the primitives:**
    - Origin uses Radix UI primitives
    - coss uses Base UI primitives
    - Understand why certain classes were used in origin
@@ -1156,12 +1155,7 @@ When asked to create an equivalent of an origin component:
    - Understand its structure and patterns
    - Note any custom classes or overrides
 
-2. **Check the migration guide:**
-   - `apps/ui/content/docs/(root)/radix-shadcn-migration.mdx`
-   - Find the component's migration section
-   - Understand prop mappings and API differences
-
-3. **Review existing particles:**
+2. **Review existing particles:**
    - Look at particles in the same category
    - Understand common patterns
    - See how similar features are implemented

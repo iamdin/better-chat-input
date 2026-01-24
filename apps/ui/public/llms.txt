@@ -7,7 +7,6 @@
 - [Introduction](https://coss.com/ui/docs/index.md)
 - [Get Started](https://coss.com/ui/docs/get-started.md)
 - [Roadmap](https://coss.com/ui/docs/roadmap.md)
-- [Radix / shadcn Migration](https://coss.com/ui/docs/radix-shadcn-migration.md): A comprehensive guide for migrating from shadcn/ui and Radix UI to coss ui components.
 
 ## Components
 
