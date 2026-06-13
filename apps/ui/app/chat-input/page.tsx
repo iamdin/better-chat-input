@@ -1,7 +1,7 @@
 "use client";
 
 import { $createTagNode, ChatInput } from "@coss/ui/components/chat-input";
-import { $insertNodes, type LexicalEditor } from "lexical";
+import { $getRoot, $insertNodes, type LexicalEditor } from "lexical";
 import { useRef, useState } from "react";
 
 export default function ChatInputShowcase() {
@@ -40,6 +40,9 @@ export default function ChatInputShowcase() {
         data-testid="insert-tag"
         onClick={() =>
           editorRef.current?.update(() => {
+            // Clicking the button blurs the editor, clearing the selection, so
+            // anchor the insertion at the end of the content explicitly.
+            $getRoot().selectEnd();
             $insertNodes([$createTagNode("user", { id: "u1", name: "Alice" })]);
           })
         }
