@@ -389,7 +389,7 @@ Expected: FAIL — cannot resolve `./TagProvider`.
 
 ```tsx
 // packages/ui/src/components/chat-input/tag/TagProvider.tsx
-import { createContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
 export type TagRenderer = (data: Record<string, unknown>) => ReactNode
 
@@ -402,23 +402,26 @@ export const TagRendererContext = createContext<TagRendererRegistry | null>(null
 
 export function TagProvider({ children }: { children: ReactNode }) {
   const renderers = useRef(new Map<string, TagRenderer>())
-  const [, setVersion] = useState(0)
+  const [version, setVersion] = useState(0)
 
+  // Stable identities so registration effects run once per mount (no re-register loop).
+  const register = useCallback((tagType: string, render: TagRenderer) => {
+    renderers.current.set(tagType, render)
+    setVersion((v) => v + 1)
+    return () => {
+      renderers.current.delete(tagType)
+      setVersion((v) => v + 1)
+    }
+  }, [])
+  const get = useCallback((tagType: string) => renderers.current.get(tagType), [])
+
+  // A NEW object reference on each version bump is required: React re-renders context
+  // consumers only when the provider value changes by Object.is. register/get stay
+  // stable inside it, so readers re-render to pick up newly registered renderers
+  // while registration effects (keyed on the stable register) do not re-fire.
   const registry = useMemo<TagRendererRegistry>(
-    () => ({
-      register(tagType, render) {
-        renderers.current.set(tagType, render)
-        setVersion((v) => v + 1)
-        return () => {
-          renderers.current.delete(tagType)
-          setVersion((v) => v + 1)
-        }
-      },
-      get(tagType) {
-        return renderers.current.get(tagType)
-      },
-    }),
-    [],
+    () => ({ register, get }),
+    [register, get, version],
   )
 
   return <TagRendererContext.Provider value={registry}>{children}</TagRendererContext.Provider>
@@ -429,7 +432,7 @@ export function TagProvider({ children }: { children: ReactNode }) {
 
 ```ts
 // packages/ui/src/components/chat-input/tag/use-tag-renderer.ts
-import { useContext, useEffect } from 'react'
+import { useContext, useEffect, useRef } from 'react'
 import { TagRendererContext, type TagRenderer } from './TagProvider'
 
 function useRegistry() {
@@ -442,14 +445,22 @@ function useRegistry() {
 
 /** Register a renderer for a tagType. Auto-unregisters on unmount. */
 export function useTagRenderer(tagType: string, render: TagRenderer): void {
-  const registry = useRegistry()
-  useEffect(() => registry.register(tagType, render), [registry, tagType, render])
+  const { register } = useRegistry()
+  // Keep the latest render in a ref so a changing/inline render function does not
+  // re-trigger registration (which would loop via the provider's version bump).
+  const renderRef = useRef(render)
+  renderRef.current = render
+  useEffect(
+    () => register(tagType, (data) => renderRef.current(data)),
+    [register, tagType],
+  )
 }
 
-/** Read the renderer for a tagType (undefined if none registered). */
+/** Read the renderer for a tagType (undefined if none registered).
+ * Reads through context so the caller re-renders when the registry changes. */
 export function useTagRendererRegistry(tagType: string): TagRenderer | undefined {
-  const registry = useRegistry()
-  return registry.get(tagType)
+  const { get } = useRegistry()
+  return get(tagType)
 }
 ```
 
@@ -939,8 +950,8 @@ import { ClearEditorPlugin } from '@lexical/react/LexicalClearEditorPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useEffect, type ReactNode } from 'react'
 import { TagNode } from './tag/TagNode'
-import { TagProvider } from './tag/TagProvider'
-import { useTagRenderer, type TagRenderer } from './tag/use-tag-renderer'
+import { TagProvider, type TagRenderer } from './tag/TagProvider'
+import { useTagRenderer } from './tag/use-tag-renderer'
 import { SubmitPlugin } from './plugins/SubmitPlugin'
 import type { SubmitPayload } from './serializer/types'
 
@@ -1202,6 +1213,27 @@ Expected: build succeeds. If the build fails on a dangling reference to a remove
 git add apps/ui/app/chat-input/page.tsx apps/ui/registry/registry-particles.ts apps/ui/registry/default/particles apps/ui/package.json docs/superpowers/plans/2026-06-11-chat-input-foundation.md
 git commit -m "feat(ui-app): show ChatInput in the web showcase, remove particle gallery"
 ```
+
+---
+
+## Task 8 results (2026-06-13, real Chrome via agent-browser)
+
+**Showcase URL:** the app has `basePath: "/ui"`, so the page serves at `http://localhost:4000/ui/chat-input` (not `/chat-input`). Dev: `bun run dev` in `apps/ui` (port 4000).
+
+**Particle removal:** the `apps/ui/registry/default/particles/` dir held the FULL Origin-UI library (~350+ `p-*.tsx`, not the 38 the plan assumed). All removed; `registry/__index__.tsx` regenerated via `bun run registry:build` (now 26 UI items, no particles). `apps/ui` build compiles, all static pages generate, `/ui/chat-input` included.
+
+**Showcase fix:** clicking the "Insert @Alice" button blurs the editor, clearing the selection, so `$insertNodes` had nothing to anchor to. Fixed by calling `$getRoot().selectEnd()` before insert (commit `095b1913`). Button verified working via native `.click()`.
+
+**E2E harness notes (agent-browser):** agent-browser's `click` does not trigger React 19's delegated `onClick`, and `press`/`keyboard` do not reach Lexical's edit pipeline. Worked around with `eval`: native `el.click()` for the button (React catches it) and `el.dispatchEvent(new KeyboardEvent('keydown', …))` for Backspace/Enter (Lexical's keydown listener handles these synthetic events; `defaultPrevented` confirms). IME composition + precise arrow-caret remain manual-only as the plan notes.
+
+**All five scenarios PASS against real Chrome:**
+1. ✅ Editor `[contenteditable=true]` renders; placeholder = "Type a message. Enter submits, Shift+Enter newlines."
+2. ✅ Typing "hello world" → editor text "hello world".
+3. ✅ Insert tag → renders as a pill (`data-testid=tag-pill`, "@Alice") via `TagNode.decorate()` → registry renderer; DOM shows `<span class="tag-node" data-lexical-decorator="true" contenteditable="false">`.
+4. ✅ **Backspace integral-delete** — one Backspace with caret after the tag removed the ENTIRE tag (pill 1→0) while "hello world" stayed fully intact. Native node-flag behavior (the 5 atomicity flags, Folo pattern) confirmed in a real browser — no custom command needed.
+5. ✅ Enter submits: payload = `{"text":"hello world￼","entities":[{"tagType":"user","data":{"id":"u1","name":"Alice"}}],"images":[],"files":[],"isEmpty":false}` — the `￼` (U+FFFC) placeholder maps to `entities[0]`; editor cleared after submit (CLEAR_EDITOR_COMMAND).
+
+The §5.3 bounded-command fallback is NOT needed: the node-flag route works in Chrome.
 
 ---
 
