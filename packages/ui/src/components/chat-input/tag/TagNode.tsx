@@ -2,6 +2,7 @@ import {
   DecoratorNode,
   type DOMExportOutput,
   type EditorConfig,
+  type LexicalEditor,
   type LexicalNode,
   type NodeKey,
   type SerializedLexicalNode,
@@ -57,8 +58,8 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return { element }
   }
 
-  decorate(_editor: unknown, _config: EditorConfig): JSX.Element {
-    return <TagView tag={this.__tag} />
+  decorate(_editor: LexicalEditor, _config: EditorConfig): JSX.Element {
+    return <TagView tag={this.getLatest().__tag} />
   }
 
   getTextContent(): string {
@@ -70,8 +71,14 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return { ...super.exportJSON(), type: 'tag', version: 1, tag: this.__tag }
   }
 
-  // These 5 flags let the Lexical kernel handle arrow-key traversal + Backspace
-  // integral-delete natively — no custom commands needed (pattern from Folo MentionNode).
+  // These 5 flags mirror Folo's MentionNode verbatim
+  // (apps/desktop/layer/renderer/src/modules/ai-chat/editor/plugins/mention/MentionNode.tsx).
+  // isInline — renders inside a paragraph like a text node.
+  // isKeyboardSelectable(false) — caret skips over it (no selection highlight ring).
+  // isSegmented — Lexical treats the node as an atomic segment; Backspace deletes the
+  //   whole node in one keystroke without custom KEY_BACKSPACE_COMMAND handlers.
+  // canInsertTextBefore(false)/canInsertTextAfter(true) — typing merges into the sibling
+  //   text node rather than splitting the decorator.
   isInline(): boolean {
     return true
   }
