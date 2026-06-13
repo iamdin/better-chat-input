@@ -1237,6 +1237,16 @@ The §5.3 bounded-command fallback is NOT needed: the node-flag route works in C
 
 ---
 
+## Follow-ups for Plan 2 (from final review, all non-blocking)
+
+- **TagNode atomicity flags — verify the real mechanism.** Final review claims `isSegmented()`, `canInsertTextBefore()`, `canInsertTextAfter()` are inert on a `DecoratorNode` (TextNode-only APIs) and that atomic Backspace works via Lexical's native inline-decorator caret-removal path instead. This conflicts with two facts: Folo's production `MentionNode` (also a DecoratorNode) sets the identical 5 flags, and the Task 8 E2E proved one-Backspace whole-tag deletion works in Chrome. Resolve against the Lexical 0.45 source: confirm which flags actually drive behavior, drop any that are genuinely dead, and correct the block comment. Do NOT change flags without re-running the agent-browser integral-delete check — current behavior is verified working.
+- **`importDOM` on TagNode.** Lexical warns that `exportDOM` without `importDOM` breaks clipboard HTML paste (a tag pasted as HTML won't rebuild a TagNode). Acceptable for the foundation; add `importDOM` when clipboard fidelity matters.
+- **`TagData` vs `TagEntity`** are structurally identical (`{tagType, data}`). Intentionally separate (editor-node shape vs serializer-output shape); add a one-line comment on each so a future cleanup doesn't merge them.
+- **`SubmitPayload.editorStateJSON`** is a reserved optional field, never populated yet — for a restore-draft feature. Mark it as such in a comment.
+- **`onSubmit` stability.** `SubmitPlugin`'s effect re-registers when `onSubmit` identity changes; document a `useCallback` recommendation on `ChatInputProps.onSubmit`.
+
+---
+
 ## Done criteria for Plan 1
 
 - `cd packages/ui && bun test src/components/chat-input` → all pass.
