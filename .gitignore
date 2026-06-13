@@ -34,3 +34,6 @@ npm-debug.log*
 # Misc
 .DS_Store
 *.pem
+
+# Vendored reference repos (local research clones, never committed)
+_repo_*

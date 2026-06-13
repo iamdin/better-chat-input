@@ -34,7 +34,10 @@
       "!**/apps/ui/registry.json",
       "!**/packages/ui/src/components",
       "!**/packages/ui/src/lib",
-      "!**/packages/ui/src/hooks"
+      "!**/packages/ui/src/hooks",
+      "!**/_repo_folo",
+      "!**/_repo_lexical",
+      "!**/_repo_mentions"
     ]
   },
   "formatter": {

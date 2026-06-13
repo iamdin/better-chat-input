@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChatInput Foundation — Plan 1/5</title>
+<style>
+:root {
+  --background: oklch(0.97 0.005 260);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --primary: oklch(0.50 0.25 280);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.50 0.18 180);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.92 0.01 260);
+  --muted-foreground: oklch(0.40 0.02 260);
+  --accent: oklch(0.60 0.22 50);
+  --accent-foreground: oklch(0.18 0.02 260);
+  --destructive: oklch(0.50 0.25 25);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.45 0.20 150);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.55 0.18 85);
+  --warning-foreground: oklch(0.18 0.02 260);
+  --border: oklch(0.88 0.01 260);
+  --input: oklch(0.92 0.01 260);
+  --ring: oklch(0.50 0.25 280);
+  --code-bg: oklch(0.22 0.02 260);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --font-display: ui-serif, Georgia, 'Times New Roman', serif;
+  --radius: 0.625rem;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+  line-height: 1.65;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1080px; margin: 0 auto; padding: 64px 24px; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+header h1 { font-family: var(--font-display); font-size: 2rem; font-weight: 500; margin: 8px 0 24px; line-height: 1.2; }
+.prompt-box { background: var(--muted); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px 24px; }
+.prompt-label { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); display: block; margin-bottom: 4px; }
+.prompt-box p { font-size: 0.92rem; color: var(--muted-foreground); line-height: 1.55; }
+
+.summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin: 32px 0; }
+.stat-card { border: 1.5px solid var(--border); border-radius: var(--radius); padding: 16px 24px; text-align: center; background: var(--card); }
+.stat-value { font-family: var(--font-display); font-size: 1.8rem; font-weight: 500; display: block; color: var(--foreground); }
+.stat-label { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); margin-top: 4px; display: block; }
+
+section { margin-top: 64px; }
+.section-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 24px; padding-bottom: 8px; border-bottom: 1.5px solid var(--border); }
+.section-number { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; color: var(--primary); }
+.section-header h2 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 500; }
+.lead { color: var(--muted-foreground); font-size: 0.95rem; max-width: 70ch; margin-bottom: 8px; }
+
+.diagram-panel { border: 1.5px solid var(--border); border-radius: var(--radius); padding: 24px; margin: 24px 0; background: var(--card); }
+.diagram-caption { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted-foreground); display: block; margin-top: 8px; text-align: center; }
+
+.code-panel { background: var(--code-bg); border-radius: var(--radius); padding: 24px; overflow-x: auto; margin: 16px 0; border: 1.5px solid var(--border); }
+.code-label { font-family: var(--font-mono); font-size: 0.7rem; color: oklch(0.70 0.02 260); display: block; margin-bottom: 8px; }
+.code-panel pre { margin: 0; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; color: oklch(0.92 0.01 260); }
+.code-panel .kw  { color: oklch(0.72 0.18 300); }
+.code-panel .fn  { color: oklch(0.78 0.16 60); }
+.code-panel .str { color: oklch(0.78 0.16 150); }
+.code-panel .cm  { color: oklch(0.60 0.02 260); font-style: italic; }
+.code-panel .num { color: oklch(0.80 0.14 85); }
+
+.risk-grid { border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.risk-row { display: grid; grid-template-columns: 1.1fr auto 1.5fr; gap: 24px; padding: 16px 24px; align-items: center; border-bottom: 1px solid var(--border); background: var(--card); }
+.risk-row:last-child { border-bottom: none; }
+.risk-name { font-weight: 500; font-size: 0.92rem; }
+.risk-mitigation { font-size: 0.88rem; color: var(--muted-foreground); }
+.badge { font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: calc(var(--radius) - 4px); text-transform: uppercase; letter-spacing: 0.04em; }
+.badge.high { background: color-mix(in oklab, var(--destructive) 15%, transparent); color: var(--destructive); }
+.badge.med { background: color-mix(in oklab, var(--warning) 15%, transparent); color: var(--warning); }
+.badge.low { background: color-mix(in oklab, var(--success) 15%, transparent); color: var(--success); }
+
+.callout { border-left: 3px solid var(--primary); padding: 16px 24px; margin: 16px 0; background: var(--card); border-radius: 0 var(--radius) var(--radius) 0; }
+.callout.ok { border-left-color: var(--success); }
+.callout h3 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 500; margin-bottom: 4px; }
+.callout p { font-size: 0.9rem; color: var(--muted-foreground); line-height: 1.55; }
+.decide-with { font-family: var(--font-mono); font-size: 0.72rem; color: var(--primary); font-weight: 500; display: block; margin-top: 8px; }
+.callout.ok .decide-with { color: var(--success); }
+
+.milestones { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+.milestone { display: grid; grid-template-columns: 96px 28px 1fr; gap: 0 18px; }
+.milestone .when { text-align: right; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted-foreground); padding-top: 4px; }
+.milestone .dot-col { display: flex; flex-direction: column; align-items: center; }
+.milestone .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 3px solid var(--primary); flex-shrink: 0; }
+.milestone .dot.done { background: var(--success); border-color: var(--success); }
+.milestone .dot.future { border-color: var(--border); }
+.milestone .line { width: 2px; flex: 1; background: var(--border); margin: 4px 0; }
+.milestone:last-child .line { display: none; }
+.milestone .body { padding-bottom: 30px; }
+.milestone .body h3 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 500; margin-bottom: 4px; }
+.milestone .body p { font-size: 0.86rem; color: var(--muted-foreground); max-width: 620px; margin-bottom: 8px; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag { font-family: var(--font-mono); font-size: 0.66rem; padding: 2px 8px; border-radius: calc(var(--radius) - 4px); background: var(--muted); color: var(--muted-foreground); }
+.tag.highlight { background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--primary); }
+
+/* mockup */
+.mockup-wrap { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; }
+@media (max-width: 760px) { .mockup-wrap { grid-template-columns: 1fr; } }
+.mock-editor { border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 14px 16px; min-height: 120px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); display: flex; flex-direction: column; gap: 10px; }
+.mock-line { font-size: 0.95rem; line-height: 1.7; }
+.mock-pill { display: inline-flex; align-items: center; gap: 4px; background: color-mix(in oklab, var(--primary) 12%, transparent); color: var(--primary); border-radius: 6px; padding: 0 6px; font-weight: 500; font-size: 0.88rem; }
+.mock-caret { display: inline-block; width: 2px; height: 1.1em; background: var(--primary); vertical-align: text-bottom; animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.mock-bar { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 8px; }
+.mock-hint { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted-foreground); }
+.mock-send { font-size: 0.8rem; background: var(--primary); color: var(--primary-foreground); border: none; border-radius: 6px; padding: 4px 12px; font-weight: 500; }
+.mock-payload { border: 1.5px solid var(--border); border-radius: var(--radius); background: var(--code-bg); padding: 16px; }
+.mock-payload pre { font-family: var(--font-mono); font-size: 0.74rem; line-height: 1.55; color: oklch(0.90 0.01 260); white-space: pre-wrap; }
+.mock-payload .code-label { color: oklch(0.70 0.02 260); }
+
+ul.clean { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+ul.clean li { padding-left: 22px; position: relative; font-size: 0.92rem; color: var(--foreground); }
+ul.clean li::before { content: '✓'; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+ul.clean li.cross::before { content: '✕'; color: var(--destructive); }
+.fineprint { color: var(--muted-foreground); font-size: 0.82rem; margin-top: 12px; }
+.foot { margin-top: 64px; padding-top: 16px; border-top: 1.5px solid var(--border); font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <span class="eyebrow">Implementation plan · @coss/ui · Plan 1 / 5</span>
+  <h1>ChatInput Foundation</h1>
+  <div class="prompt-box">
+    <span class="prompt-label">Brief</span>
+    <p>把 ChatInput 从 plain textarea 重构为基于 Lexical 的富文本输入,作为 <strong>@coss/ui 的一个组件</strong>(复用现有 primitive)。本切片:统一 TagNode(渲染与触发解耦)+ Enter 提交 + 结构化序列化;并把 apps/ui 展示站从 Origin-UI particle 画廊换成展示 ChatInput。后续 TriggerComposer 引擎/合并/数据源归 Plan 2–5。</p>
+  </div>
+</header>
+
+<div class="summary-strip">
+  <div class="stat-card"><span class="stat-value">1</span><span class="stat-label">Component</span></div>
+  <div class="stat-card"><span class="stat-value">8</span><span class="stat-label">Tasks (TDD)</span></div>
+  <div class="stat-card"><span class="stat-value">19</span><span class="stat-label">Auto tests</span></div>
+  <div class="stat-card"><span class="stat-value">0</span><span class="stat-label">New packages</span></div>
+  <div class="stat-card"><span class="stat-value">38</span><span class="stat-label">Particles removed</span></div>
+</div>
+
+<!-- ARCHITECTURE -->
+<section>
+  <div class="section-header"><span class="section-number">01</span><h2>架构:两层 Provider 解耦</h2></div>
+  <p class="lead">ChatInput 住在 <code>@coss/ui</code> 里,建在它的基础 primitive 之上。关键解耦:<strong>触发能力</strong>(后续 TriggerComposer)与<strong>渲染能力</strong>(TagProvider 注册表)分离——只读展示历史消息只需后者,持久 TagNode 永不依赖触发插件在场。</p>
+  <div class="diagram-panel">
+    <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+      <style>
+        .box { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+        .new { fill: color-mix(in oklab, var(--primary) 8%, transparent); stroke: var(--primary); stroke-width: 1.5; }
+        .grp { fill: none; stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 4 4; }
+        .title { font-family: var(--font-sans); font-size: 13px; font-weight: 600; fill: var(--foreground); }
+        .sub { font-family: var(--font-mono); font-size: 10px; fill: var(--muted-foreground); }
+        .glabel { font-family: var(--font-mono); font-size: 10px; font-weight: 600; fill: var(--primary); letter-spacing: 0.04em; }
+        .conn { stroke: var(--muted-foreground); stroke-width: 1.5; }
+        .conn-d { stroke: var(--primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+        .elabel { font-family: var(--font-mono); font-size: 9px; fill: var(--muted-foreground); }
+      </style>
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted-foreground)"/></marker>
+        <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--primary)"/></marker>
+      </defs>
+
+      <!-- TagProvider group -->
+      <rect x="16" y="16" width="520" height="328" rx="12" class="grp"/>
+      <text x="32" y="38" class="glabel">&lt;TagProvider&gt;  ·  renderTag 注册表(渲染能力)</text>
+
+      <!-- LexicalComposer group -->
+      <rect x="36" y="56" width="480" height="270" rx="10" class="grp" style="stroke:var(--muted-foreground);opacity:0.6"/>
+      <text x="52" y="78" class="sub" style="font-weight:600;fill:var(--muted-foreground)">&lt;LexicalComposer&gt;  nodes:[TagNode]</text>
+
+      <!-- ContentEditable -->
+      <rect x="56" y="96" width="180" height="52" rx="10" class="box"/>
+      <text x="146" y="118" text-anchor="middle" class="title">RichText / ContentEditable</text>
+      <text x="146" y="134" text-anchor="middle" class="sub">+ History</text>
+
+      <!-- SubmitPlugin -->
+      <rect x="316" y="96" width="180" height="52" rx="10" class="new"/>
+      <text x="406" y="118" text-anchor="middle" class="title">SubmitPlugin</text>
+      <text x="406" y="134" text-anchor="middle" class="sub" style="fill:var(--primary)">Enter / Shift+Enter</text>
+
+      <!-- TagNode -->
+      <rect x="56" y="196" width="180" height="56" rx="10" class="new"/>
+      <text x="146" y="218" text-anchor="middle" class="title">TagNode</text>
+      <text x="146" y="234" text-anchor="middle" class="sub" style="fill:var(--primary)">DecoratorNode · 5 flags</text>
+
+      <!-- TagView -->
+      <rect x="316" y="196" width="180" height="56" rx="10" class="box"/>
+      <text x="406" y="218" text-anchor="middle" class="title">TagView</text>
+      <text x="406" y="234" text-anchor="middle" class="sub">reads registry · fallback</text>
+
+      <!-- decorate arrow -->
+      <line x1="236" y1="224" x2="316" y2="224" class="conn" marker-end="url(#a)"/>
+      <text x="276" y="216" text-anchor="middle" class="elabel">decorate()</text>
+
+      <!-- TagView reads TagProvider (dashed up) -->
+      <path d="M406,196 C406,120 470,90 500,52" fill="none" class="conn-d" marker-end="url(#ap)"/>
+      <text x="486" y="150" class="elabel" style="fill:var(--primary)">useTagRenderer</text>
+
+      <!-- editor -> submit -->
+      <line x1="236" y1="122" x2="316" y2="122" class="conn" marker-end="url(#a)"/>
+
+      <!-- serializer + payload (right column) -->
+      <rect x="576" y="96" width="168" height="52" rx="10" class="box"/>
+      <text x="660" y="118" text-anchor="middle" class="title">serializeEditorState</text>
+      <text x="660" y="134" text-anchor="middle" class="sub">EditorState → payload</text>
+
+      <rect x="576" y="196" width="168" height="56" rx="10" class="new"/>
+      <text x="660" y="218" text-anchor="middle" class="title">SubmitPayload</text>
+      <text x="660" y="234" text-anchor="middle" class="sub" style="fill:var(--primary)">{ text, entities, … }</text>
+
+      <!-- submit -> serialize -->
+      <path d="M496,122 C536,122 540,122 576,122" fill="none" class="conn" marker-end="url(#a)"/>
+      <line x1="660" y1="148" x2="660" y2="196" class="conn" marker-end="url(#a)"/>
+      <text x="660" y="174" text-anchor="middle" class="elabel">onSubmit</text>
+    </svg>
+    <span class="diagram-caption">编辑场景:TagProvider 包住 Composer;TagView 经 useTagRenderer 读注册表(虚线),缺失则降级纯文本</span>
+  </div>
+</section>
+
+<!-- DATA FLOW -->
+<section>
+  <div class="section-header"><span class="section-number">02</span><h2>数据流:￼ 占位一一对应</h2></div>
+  <p class="lead">序列化遍历 EditorState:文本累加,每个 TagNode 在 text 里产出一个 <code>￼</code>(U+FFFC),<code>entities[i]</code> 对应第 i 个占位符,顺序严格对应——两个同名 @Alice 也能区分。</p>
+  <div class="diagram-panel">
+    <svg viewBox="0 0 760 150" xmlns="http://www.w3.org/2000/svg" style="width:100%">
+      <style>
+        .b { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+        .t { font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; fill: var(--foreground); }
+        .s { font-family: var(--font-mono); font-size: 10px; fill: var(--muted-foreground); }
+        .c { stroke: var(--muted-foreground); stroke-width: 1.5; }
+      </style>
+      <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted-foreground)"/></marker></defs>
+      <rect x="20" y="48" width="210" height="54" rx="10" class="b"/>
+      <text x="125" y="70" text-anchor="middle" class="t">EditorState</text>
+      <text x="125" y="88" text-anchor="middle" class="s">Text · TagNode · Text · TagNode</text>
+      <line x1="230" y1="75" x2="300" y2="75" class="c" marker-end="url(#a2)"/>
+      <rect x="300" y="48" width="160" height="54" rx="10" class="b" style="fill:color-mix(in oklab, var(--primary) 8%, transparent);stroke:var(--primary)"/>
+      <text x="380" y="70" text-anchor="middle" class="t">serialize()</text>
+      <text x="380" y="88" text-anchor="middle" class="s" style="fill:var(--primary)">walk + ￼</text>
+      <line x1="460" y1="75" x2="530" y2="75" class="c" marker-end="url(#a2)"/>
+      <rect x="530" y="32" width="210" height="86" rx="10" class="b"/>
+      <text x="635" y="54" text-anchor="middle" class="s" style="fill:var(--foreground);font-weight:600">text: "帮我看 ￼ 和 ￼ 写的"</text>
+      <text x="635" y="76" text-anchor="middle" class="s">entities[0] = file</text>
+      <text x="635" y="94" text-anchor="middle" class="s">entities[1] = user</text>
+      <text x="635" y="112" text-anchor="middle" class="s" style="fill:var(--muted-foreground)">images:[] files:[] isEmpty:false</text>
+    </svg>
+    <span class="diagram-caption">下游按 ￼ 切分就位;需纯展示时把 ￼ 换回 @name(来自对应 entity)</span>
+  </div>
+</section>
+
+<!-- MOCKUP -->
+<section>
+  <div class="section-header"><span class="section-number">03</span><h2>成果样子</h2></div>
+  <div class="mockup-wrap">
+    <div>
+      <div class="mock-editor">
+        <div class="mock-line">帮我看一下 <span class="mock-pill">📄 @app.tsx</span> 的性能问题<span class="mock-caret"></span></div>
+        <div style="flex:1"></div>
+        <div class="mock-bar">
+          <span class="mock-hint">Enter 提交 · Shift+Enter 换行</span>
+          <button class="mock-send">Send</button>
+        </div>
+      </div>
+      <p class="fineprint">tag 渲染成可交互 pill;光标左右键整体跨过、Backspace 整删——靠 TagNode 的 5 个 flag,内核原生处理(Folo 验证)。</p>
+    </div>
+    <div class="mock-payload">
+      <span class="code-label">onSubmit(payload)</span>
+      <pre>{
+  "text": "帮我看一下 ￼ 的性能问题",
+  "entities": [
+    { "tagType": "file",
+      "data": { "name": "app.tsx" } }
+  ],
+  "images": [], "files": [],
+  "isEmpty": false
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- PLAN SERIES -->
+<section>
+  <div class="section-header"><span class="section-number">04</span><h2>计划序列(本份 = Plan 1)</h2></div>
+  <div class="milestones">
+    <div class="milestone">
+      <div class="when">Plan 1 · 本份</div>
+      <div class="dot-col"><span class="dot done"></span><span class="line"></span></div>
+      <div class="body">
+        <h3>Foundation + TagNode</h3>
+        <p>接入 @coss/ui;TagNode + 5 flag、TagProvider 渲染解耦、SubmitPlugin、序列化;展示站换成 ChatInput。产出可运行可测的富输入。</p>
+        <div class="tags"><span class="tag highlight">TagNode</span><span class="tag highlight">TagProvider</span><span class="tag highlight">serialize</span><span class="tag">SubmitPlugin</span></div>
+      </div>
+    </div>
+    <div class="milestone">
+      <div class="when">Plan 2</div>
+      <div class="dot-col"><span class="dot"></span><span class="line"></span></div>
+      <div class="body">
+        <h3>TriggerComposer 引擎(单源)</h3>
+        <p>照 Folo 轻量自建(不用官方 TypeaheadMenuPlugin):updateListener 检测、单一仲裁中枢、useTriggerSlot/Source、单源菜单、IME 门控、CJK 正则。含合并菜单 spike。菜单 UI 复用 @coss/ui popover/scroll-area/command。</p>
+        <div class="tags"><span class="tag">TriggerComposer</span><span class="tag">useTriggerSource</span></div>
+      </div>
+    </div>
+    <div class="milestone">
+      <div class="when">Plan 3</div>
+      <div class="dot-col"><span class="dot future"></span><span class="line"></span></div>
+      <div class="body">
+        <h3>多源合并 + 两阶段</h3>
+        <p>同字符多源合并(kind:menu)、逃生口面板(kind:custom,ComboboxPlugin 式)、跨组键盘、Enter/Submit 仲裁。</p>
+      </div>
+    </div>
+    <div class="milestone">
+      <div class="when">Plan 4</div>
+      <div class="dot-col"><span class="dot future"></span><span class="line"></span></div>
+      <div class="body">
+        <h3>选中 · 数据 · 插件</h3>
+        <p>异步选中(乐观占位 + NodeKey 锚定)、React Query 数据源、AttachmentPlugin + ImageNode、首批 trigger 插件。</p>
+      </div>
+    </div>
+    <div class="milestone">
+      <div class="when">Plan 5</div>
+      <div class="dot-col"><span class="dot future"></span><span class="line"></span></div>
+      <div class="body">
+        <h3>打磨</h3>
+        <p>IME/CJK 端到端、定位边界、a11y、跨端、性能(必要时升级外部 store)。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KEY CODE -->
+<section>
+  <div class="section-header"><span class="section-number">05</span><h2>关键接口</h2></div>
+  <p class="lead">TagNode 的 5 个 flag 是整份计划的去风险核心——让内核原生处理光标跨过与整删,无需手写命令。</p>
+  <div class="code-panel">
+    <span class="code-label">src/components/chat-input/tag/TagNode.tsx</span>
+<pre><span class="kw">class</span> <span class="fn">TagNode</span> <span class="kw">extends</span> <span class="fn">DecoratorNode</span>&lt;<span class="fn">JSX.Element</span>&gt; {
+  <span class="cm">// 这 5 个 flag → Lexical 内核自动处理「整体跨过 + Backspace 整删」(零命令)</span>
+  <span class="fn">isInline</span>() { <span class="kw">return</span> <span class="kw">true</span> }
+  <span class="fn">isKeyboardSelectable</span>() { <span class="kw">return</span> <span class="kw">false</span> }   <span class="cm">// 光标不进入内部</span>
+  <span class="fn">isSegmented</span>() { <span class="kw">return</span> <span class="kw">true</span> }              <span class="cm">// 原子单位</span>
+  <span class="fn">canInsertTextBefore</span>() { <span class="kw">return</span> <span class="kw">false</span> }
+  <span class="fn">canInsertTextAfter</span>() { <span class="kw">return</span> <span class="kw">true</span> }
+  <span class="fn">decorate</span>() { <span class="kw">return</span> &lt;<span class="fn">TagView</span> tag={<span class="kw">this</span>.__tag} /&gt; }  <span class="cm">// 渲染经注册表解耦</span>
+}</pre>
+  </div>
+  <div class="code-panel">
+    <span class="code-label">src/components/chat-input/serializer/types.ts</span>
+<pre><span class="kw">interface</span> <span class="fn">SubmitPayload</span> {
+  <span class="fn">text</span>: <span class="kw">string</span>            <span class="cm">// 每个 tag = 一个 ￼ 占位</span>
+  <span class="fn">entities</span>: <span class="fn">TagEntity</span>[]   <span class="cm">// entities[i] ↔ text 第 i 个 ￼</span>
+  <span class="fn">images</span>: <span class="fn">ImagePayload</span>[]
+  <span class="fn">files</span>: <span class="fn">FilePayload</span>[]
+  <span class="fn">isEmpty</span>: <span class="kw">boolean</span>
+}</pre>
+  </div>
+</section>
+
+<!-- RISKS -->
+<section>
+  <div class="section-header"><span class="section-number">06</span><h2>风险与对策</h2></div>
+  <div class="risk-grid">
+    <div class="risk-row">
+      <div class="risk-name">inline DecoratorNode 原生方向键/整删行为</div>
+      <div><span class="badge med">MED</span></div>
+      <div class="risk-mitigation">happy-dom 测不了真实 contenteditable 选区 → Task 8 真机 checklist 验证;失败则按 spec §5.3 补 KEY_ARROW/BACKSPACE 兜底。Folo 已验证。</div>
+    </div>
+    <div class="risk-row">
+      <div class="risk-name">删 38 个 particle 后展示站构建失败</div>
+      <div><span class="badge med">MED</span></div>
+      <div class="risk-mitigation">Task 8 跑 bun run build 验证;已知引用方仅 content/docs/components/button.mdx + meta.json,失败即删。</div>
+    </div>
+    <div class="risk-row">
+      <div class="risk-name">RichTextPlugin placeholder prop 签名跨版本差异</div>
+      <div><span class="badge low">LOW</span></div>
+      <div class="risk-mitigation">改动前核对 node_modules 的 .d.ts;必要时改用 render-function 形式,断言不变。</div>
+    </div>
+    <div class="risk-row">
+      <div class="risk-name">编辑器逻辑的测试环境</div>
+      <div><span class="badge low">LOW</span></div>
+      <div class="risk-mitigation">纯逻辑/命令用 @lexical/headless,组件用 RTL+happy-dom;命令以 dispatchCommand 程序化触发。</div>
+    </div>
+  </div>
+</section>
+
+<!-- DECISIONS LOCKED -->
+<section>
+  <div class="section-header"><span class="section-number">07</span><h2>已锁定的设计决策</h2></div>
+  <div class="callout ok">
+    <h3>不用官方 LexicalTypeaheadMenuPlugin</h3>
+    <p>实证:Folo 与 lobe-editor 都没 import 它(单 trigger 假设、菜单状态绑死、无法合并)。引擎照 Folo 轻量自建,加显式 TriggerComposer 仲裁中枢。</p>
+    <span class="decide-with">已定 · 代码 grep 验证</span>
+  </div>
+  <div class="callout ok">
+    <h3>同字符多源:合并 + 两阶段都支持</h3>
+    <p>映射到 kind:'menu'(合并菜单)与 kind:'custom'(两阶段逃生口)。合并是唯一无开源先例处,Plan 2 先 spike。</p>
+    <span class="decide-with">已定 · 用户拍板</span>
+  </div>
+  <div class="callout ok">
+    <h3>packages/ui 保留,ChatInput 复用其 primitive</h3>
+    <p>只清 apps/ui 展示的 particle demo;菜单 UI(Plan 2)复用 popover/scroll-area/command。</p>
+    <span class="decide-with">已定 · 用户澄清</span>
+  </div>
+</section>
+
+<div class="foot">docs/superpowers/plans/2026-06-11-chat-input-foundation.md · Plan 1 of 5 · TDD · 审批后进 subagent-driven 执行</div>
+
+</div>
+</body>
+</html>
