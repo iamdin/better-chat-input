@@ -5,7 +5,8 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { ClearEditorPlugin } from '@lexical/react/LexicalClearEditorPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import type { LexicalEditor } from 'lexical'
 import { TagNode } from './tag/TagNode'
 import { TagProvider } from './tag/TagProvider'
 import { useTagRenderer } from './tag/use-tag-renderer'
@@ -24,7 +25,7 @@ export interface ChatInputProps {
   placeholder?: string
   tagRenderers?: TagRendererSpec[]
   /** Exposes the underlying editor once mounted (used by demos and E2E tests). */
-  onReady?: (editor: import('lexical').LexicalEditor) => void
+  onReady?: (editor: LexicalEditor) => void
 }
 
 function RegisterOne({ spec }: { spec: TagRendererSpec }): null {
@@ -34,7 +35,10 @@ function RegisterOne({ spec }: { spec: TagRendererSpec }): null {
 
 function OnReady({ onReady }: { onReady?: ChatInputProps['onReady'] }): null {
   const [editor] = useLexicalComposerContext()
+  const firedRef = useRef(false)
   useEffect(() => {
+    if (firedRef.current) return
+    firedRef.current = true
     onReady?.(editor)
   }, [editor, onReady])
   return null
