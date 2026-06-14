@@ -62,6 +62,12 @@ function searchFiles(query: string): Promise<FileItem[]> {
   });
 }
 
+// Stand-in for a slow second fetch (e.g. resolving the full path / metadata)
+// that only runs after the user picks a file — drives the §4.8 async path.
+function fetchFilePath(f: FileItem): Promise<string> {
+  return new Promise((resolve) => setTimeout(() => resolve(f.path), 900));
+}
+
 const queryClient = new QueryClient();
 
 // Two independent, self-registering plugins both using '@' — the engine merges
@@ -106,10 +112,16 @@ function FileMentionPlugin() {
   });
   useTagRenderer("file", (d) => (
     <span
+      data-pending={d.pending ? "true" : undefined}
       data-testid="tag-pill"
-      style={{ background: "#e0ffe8", borderRadius: 4, padding: "0 4px" }}
+      style={{
+        background: d.pending ? "#fff3cd" : "#e0ffe8",
+        borderRadius: 4,
+        padding: "0 4px",
+      }}
     >
-      📄{String(d.name)}
+      {d.pending ? "⏳" : "📄"}
+      {String(d.name)}
     </span>
   ));
   useTriggerSource<FileItem>({
@@ -118,9 +130,14 @@ function FileMentionPlugin() {
     id: "file",
     items: data ?? [],
     loading: isLoading,
+    // Async selection (spec §4.8): show a loading placeholder immediately, then
+    // re-anchor by NodeKey once the path resolves — typing during the wait is safe.
     onSelect: (f) => ({
-      toNode: () =>
-        $createTagNode("file", { id: f.id, name: f.name, path: f.path }),
+      pending: () =>
+        $createTagNode("file", { id: f.id, name: f.name, pending: true }),
+      resolve: fetchFilePath(f).then((path) => ({
+        toNode: () => $createTagNode("file", { id: f.id, name: f.name, path }),
+      })),
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,

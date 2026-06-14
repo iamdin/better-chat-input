@@ -15,5 +15,9 @@ export { useTriggerSource } from './trigger-composer/use-trigger-source'
 export type { TriggerSourceConfig } from './trigger-composer/use-trigger-source'
 export { useTypeaheadKeyboard } from './trigger-composer/use-typeahead-keyboard'
 export type { TypeaheadKeyboardHandlers } from './trigger-composer/use-typeahead-keyboard'
-export type { SelectResult, TriggerEditorAPI } from './trigger-composer/apply-select-result'
+export type {
+  PendingSelect,
+  SelectResult,
+  TriggerEditorAPI,
+} from './trigger-composer/apply-select-result'
 export type { CharMatchConfig } from './trigger/match'

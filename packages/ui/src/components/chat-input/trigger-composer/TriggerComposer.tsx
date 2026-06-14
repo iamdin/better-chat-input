@@ -24,7 +24,13 @@ import {
 import { createPortal } from 'react-dom'
 import { $isTagNode } from '../tag/TagNode'
 import { type CharMatchConfig, matchTrigger } from '../trigger/match'
-import { applySelectResult, type SelectResult } from './apply-select-result'
+import {
+  anchorPending,
+  applySelectResult,
+  isPendingSelect,
+  type PendingSelect,
+  type SelectResult,
+} from './apply-select-result'
 import {
   TriggerComposerContext,
   type RegisteredSource,
@@ -120,8 +126,15 @@ export function TriggerComposer({
   }, [])
 
   const select = useCallback(
-    (id: string, result: SelectResult) => {
-      applySelectResult(editor, matchStartRef.current, result)
+    (_id: string, result: SelectResult | PendingSelect) => {
+      const matchStart = matchStartRef.current
+      if (isPendingSelect(result)) {
+        // Free the menu/caret immediately, then anchor the async result by key.
+        close()
+        void anchorPending(editor, matchStart, result)
+        return
+      }
+      applySelectResult(editor, matchStart, result)
       close()
     },
     [editor, close],
@@ -168,10 +181,16 @@ export function TriggerComposer({
       if (!c) return
       const source = registryRef.current.get(c.sourceId)
       if (!source) return
-      Promise.resolve(source.onSelect(c.item)).then((result) => {
-        applySelectResult(editor, matchStartRef.current, result)
+      const matchStart = matchStartRef.current
+      const result = source.onSelect(c.item)
+      if (isPendingSelect(result)) {
+        // Optimistic placeholder now, real node re-anchored by key later (§4.8).
         close()
-      })
+        void anchorPending(editor, matchStart, result)
+        return
+      }
+      applySelectResult(editor, matchStart, result)
+      close()
     },
     [editor, close],
   )

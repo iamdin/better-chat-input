@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { SelectResult } from './apply-select-result'
+import type { PendingSelect, SelectResult } from './apply-select-result'
 import { useTriggerComposerContext } from './context'
 
 export interface TriggerSlot {
@@ -8,7 +8,7 @@ export interface TriggerSlot {
   /** Current search term (empty when not active). */
   query: string
   /** Manually apply a selection (escape-hatch / custom panels, spec §4.11). */
-  select: (result: SelectResult) => void
+  select: (result: SelectResult | PendingSelect) => void
   /** Close the menu. */
   close: () => void
 }

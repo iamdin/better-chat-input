@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { SelectResult } from './apply-select-result'
+import type { PendingSelect, SelectResult } from './apply-select-result'
 
 /** A candidate source registered by a trigger plugin (spec §4.4). */
 export interface RegisteredSource {
@@ -13,7 +13,7 @@ export interface RegisteredSource {
   loading?: boolean
   error?: unknown
   renderItem: (item: unknown) => ReactNode
-  onSelect: (item: unknown) => SelectResult | Promise<SelectResult>
+  onSelect: (item: unknown) => SelectResult | PendingSelect
 }
 
 /** The reactive content pushed on each render (everything but the static id). */
@@ -29,7 +29,7 @@ export interface TriggerComposerEngine {
   query: string
   register: (id: string, char: string, order?: number) => () => void
   patch: (id: string, partial: SourcePatch) => void
-  select: (id: string, result: SelectResult) => void
+  select: (id: string, result: SelectResult | PendingSelect) => void
   close: () => void
 }
 

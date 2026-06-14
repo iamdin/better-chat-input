@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import type { SelectResult } from './apply-select-result'
+import type { PendingSelect, SelectResult } from './apply-select-result'
 import { useTriggerComposerContext } from './context'
 
 export interface TriggerSourceConfig<T> {
@@ -16,7 +16,7 @@ export interface TriggerSourceConfig<T> {
   loading?: boolean
   error?: unknown
   renderItem: (item: T) => ReactNode
-  onSelect: (item: T) => SelectResult | Promise<SelectResult>
+  onSelect: (item: T) => SelectResult | PendingSelect
 }
 
 /**
@@ -41,7 +41,7 @@ export function useTriggerSource<T>(config: TriggerSourceConfig<T>): void {
       renderItem: config.renderItem as (item: unknown) => ReactNode,
       onSelect: config.onSelect as (
         item: unknown,
-      ) => SelectResult | Promise<SelectResult>,
+      ) => SelectResult | PendingSelect,
     })
   })
 }
