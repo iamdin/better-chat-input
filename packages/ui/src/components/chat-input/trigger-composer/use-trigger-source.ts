@@ -9,6 +9,8 @@ export interface TriggerSourceConfig<T> {
   group?: string
   /** Display order among sources sharing the char. */
   order?: number
+  /** 'menu' (default) joins the merged menu; 'custom' draws its own UI (spec §4.11). */
+  kind?: 'menu' | 'custom'
   /** Reactive candidates (typically from useQuery). */
   items: T[]
   loading?: boolean
@@ -32,6 +34,7 @@ export function useTriggerSource<T>(config: TriggerSourceConfig<T>): void {
     engine.patch(id, {
       group: config.group,
       order: config.order,
+      kind: config.kind,
       items: config.items as unknown[],
       loading: config.loading,
       error: config.error,

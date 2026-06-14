@@ -115,19 +115,30 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
     [editor, close],
   )
 
-  // Grouped menu + flat candidates for the active char, ordered by source.order.
-  const groups: MenuGroup[] = useMemo(() => {
+  // Active sources for the current char, ordered. A 'custom' source means the
+  // engine yields the menu + keyboard to that plugin (escape hatch, spec §4.11).
+  const activeSources = useMemo(() => {
     void menuVersion // recompute when the registry changes
     if (!activeChar) return []
-    const sources = [...registryRef.current.values()]
+    return [...registryRef.current.values()]
       .filter((s) => s.char === activeChar)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    let i = 0
-    return sources.map((source) => ({
-      source,
-      items: source.items.map((item) => ({ item, index: i++ })),
-    }))
   }, [activeChar, menuVersion])
+
+  const hasCustom = activeSources.some((s) => s.kind === 'custom')
+  const hasCustomRef = useRef(hasCustom)
+  hasCustomRef.current = hasCustom
+
+  // Merged menu groups (menu-kind sources only) with a global item index.
+  const groups: MenuGroup[] = useMemo(() => {
+    let i = 0
+    return activeSources
+      .filter((s) => s.kind !== 'custom')
+      .map((source) => ({
+        source,
+        items: source.items.map((item) => ({ item, index: i++ })),
+      }))
+  }, [activeSources])
 
   const candidates: Candidate[] = useMemo(
     () =>
@@ -205,7 +216,8 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
         KEY_ARROW_DOWN_COMMAND,
         (event) => {
           const len = candidatesRef.current.length
-          if (!activeCharRef.current || len === 0) return false
+          if (!activeCharRef.current || hasCustomRef.current || len === 0)
+            return false
           event?.preventDefault()
           setHighlighted((h) => (h + 1) % len)
           return true
@@ -216,7 +228,8 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
         KEY_ARROW_UP_COMMAND,
         (event) => {
           const len = candidatesRef.current.length
-          if (!activeCharRef.current || len === 0) return false
+          if (!activeCharRef.current || hasCustomRef.current || len === 0)
+            return false
           event?.preventDefault()
           setHighlighted((h) => (h - 1 + len) % len)
           return true
@@ -227,7 +240,11 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
       editor.registerCommand(
         KEY_ENTER_COMMAND,
         (event) => {
-          if (!activeCharRef.current || candidatesRef.current.length === 0) {
+          if (
+            !activeCharRef.current ||
+            hasCustomRef.current ||
+            candidatesRef.current.length === 0
+          ) {
             return false
           }
           event?.preventDefault()
@@ -239,7 +256,11 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
       editor.registerCommand(
         KEY_TAB_COMMAND,
         (event) => {
-          if (!activeCharRef.current || candidatesRef.current.length === 0) {
+          if (
+            !activeCharRef.current ||
+            hasCustomRef.current ||
+            candidatesRef.current.length === 0
+          ) {
             return false
           }
           event?.preventDefault()
@@ -251,7 +272,7 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
       editor.registerCommand(
         KEY_ESCAPE_COMMAND,
         () => {
-          if (!activeCharRef.current) return false
+          if (!activeCharRef.current || hasCustomRef.current) return false
           close()
           return true
         },
@@ -260,12 +281,37 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
     )
   }, [editor, choose, close])
 
+  // Dev-only mutual-exclusion check: a char may host N 'menu' sources OR exactly
+  // one 'custom' source, never both. Deferred to a macrotask so StrictMode double
+  // mounts / hot-reload mount-unmount ordering don't trip a false warning (§4.5).
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return
+    const t = setTimeout(() => {
+      const kindsByChar = new Map<string, Set<string>>()
+      for (const s of registryRef.current.values()) {
+        const kinds = kindsByChar.get(s.char) ?? new Set<string>()
+        kinds.add(s.kind ?? 'menu')
+        kindsByChar.set(s.char, kinds)
+      }
+      for (const [char, kinds] of kindsByChar) {
+        if (kinds.has('menu') && kinds.has('custom')) {
+          console.error(
+            `[TriggerComposer] char "${char}" mixes 'menu' and 'custom' sources; ` +
+              'they cannot coexist (spec §4.5).',
+          )
+        }
+      }
+    }, 0)
+    return () => clearTimeout(t)
+  }, [menuVersion])
+
   const engine = useMemo<TriggerComposerEngine>(
     () => ({ activeChar, query, register, patch, select, close }),
     [activeChar, query, register, patch, select, close],
   )
 
-  const showMenu = activeChar !== null && rect !== null
+  // A custom source draws its own UI, so the engine hides the merged menu.
+  const showMenu = activeChar !== null && rect !== null && !hasCustom
   const hasItems = candidates.length > 0
   const anyLoading = groups.some((g) => g.source.loading)
 

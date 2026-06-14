@@ -7,6 +7,8 @@ export interface RegisteredSource {
   char: string
   group?: string
   order?: number
+  /** 'menu' joins the merged menu (default); 'custom' draws its own UI (spec §4.11). */
+  kind?: 'menu' | 'custom'
   items: unknown[]
   loading?: boolean
   error?: unknown

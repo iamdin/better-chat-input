@@ -13,6 +13,7 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { useState } from "react";
+import { TeamCascadePlugin } from "./team-cascade-plugin";
 
 interface User {
   id: string;
@@ -138,16 +139,18 @@ export default function ChatInputShowcase() {
       >
         <h1>ChatInput</h1>
         <p style={{ color: "#666", fontSize: 14 }}>
-          Two independent <code>@</code> plugins (Users + Files), each React
-          Query–driven, merged into one grouped menu by the engine. ↑↓ moves
-          across groups · Enter / Tab select · Esc close.
+          <code>@</code> = two merged menu plugins (Users + Files).{" "}
+          <code>#</code> = a custom escape-hatch plugin with a Raycast-style
+          cascade (Teams → members): type to filter, → / Enter drill, ← /
+          Backspace back. Both are React Query–driven.
         </p>
         <ChatInput
           onSubmit={(p) => setLast(JSON.stringify(p, null, 2))}
-          placeholder="Message — type @ to mention a user or file…"
+          placeholder="Message — @ for users/files, # for a team member…"
         >
           <UserMentionPlugin />
           <FileMentionPlugin />
+          <TeamCascadePlugin />
         </ChatInput>
         <pre
           data-testid="payload"
