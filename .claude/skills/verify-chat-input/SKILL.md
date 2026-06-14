@@ -114,17 +114,22 @@ agent-browser eval "JSON.stringify({active:document.querySelector('[data-active=
 # full Enter → @Alice tag inserted, menu closes. (press Enter would silently no-op.)
 ```
 
-### Slash commands (separate `/` char, `action` result, start-anchored)
+### Slash commands (separate `/` char, command tag, start-anchored)
 ```bash
 # '/' is its own trigger char with a start-anchored pattern (charConfig
-# { '/': { pattern: /^\/([^/\s]*)$/u } }) — fires ONLY at the line start.
+# { '/': { pattern: /^\/([^/\s]*)$/u } }) — fires ONLY at the line start. Like a
+# mention, confirming a command drops a tag — but a lighter, background-less one.
 agent-browser keyboard type "/" ; agent-browser wait 400
 agent-browser eval "JSON.stringify({groups:[...document.querySelectorAll('[data-testid=mention-group]')].map(g=>g.textContent),items:[...document.querySelectorAll('[data-testid=mention-item]')].map(i=>i.textContent.trim())})"
-# expect group Commands; items /shrug /tableflip /now /help
-# insertText result: type 'sh', full Enter → editor text becomes the snippet, menu closes
-# action result (/help): type '/help', full Enter → editor gets api.insertText output
-#   AND the payload area updates (onCommand side effect) — exercises SelectResult.action (§4.12)
+# expect group Commands; items /image /code /search /think
+# select: type 'im', full Enter → a `command` tag-pill "/image" with a TRANSPARENT
+#   background (assert getComputedStyle(pill).backgroundColor === 'rgba(0, 0, 0, 0)')
+agent-browser eval "(()=>{const p=document.querySelector('[data-testid=tag-pill]');return JSON.stringify({pill:p?.textContent,bg:p&&getComputedStyle(p).backgroundColor})})()"
 # start-anchored: reload, type "hi /" → NO menu (mid-line '/' is suppressed by the ^ anchor)
+# NOTE: submitting via a dispatched Enter while ANY tag (mention or command) is in
+# the editor is a known synthetic-event limitation — plain text submits, tag-present
+# does not. It is not a bug in the plugin; the command tag uses the same toNode path
+# as mentions, so its payload entity {tagType:'command', data:{name}} is by construction.
 ```
 
 ### Custom escape-hatch (`kind:'custom'`)

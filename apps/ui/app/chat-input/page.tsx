@@ -4,8 +4,6 @@ import {
   $createTagNode,
   type CharMatchConfig,
   ChatInput,
-  type SelectResult,
-  type TriggerEditorAPI,
   useTagRenderer,
   useTriggerSlot,
   useTriggerSource,
@@ -39,13 +37,11 @@ interface Team {
   members: Member[];
 }
 
-// A slash command: typed as `/name`, it runs an effect rather than inserting a
-// mention tag. `run` returns a SelectResult — `insertText` swaps the `/cmd` run
-// for a snippet, `action` runs a side effect with no node left behind (§4.12).
+// A slash command. Like a mention, confirming one drops a tag into the editor —
+// just a lighter, background-less one (the `command` tag renderer below).
 interface Command {
   hint: string;
   name: string;
-  run: () => SelectResult;
 }
 
 const USERS: User[] = [
@@ -126,6 +122,13 @@ function fetchFilePath(f: FileItem): Promise<string> {
 const CHAR_CONFIG: Record<string, CharMatchConfig> = {
   "/": { pattern: /^\/([^/\s]*)$/u },
 };
+
+const COMMANDS: Command[] = [
+  { hint: "generate an image from a prompt", name: "image" },
+  { hint: "format the reply as code", name: "code" },
+  { hint: "search the web first", name: "search" },
+  { hint: "use extended thinking", name: "think" },
+];
 
 const queryClient = new QueryClient();
 
@@ -248,53 +251,30 @@ function TeamMentionPlugin() {
   return null;
 }
 
-// A slash-command plugin on its own '/' char (not '@'). Unlike the mention
-// plugins it inserts no tag: each command's `run` returns either an `insertText`
-// (swap `/cmd` for a snippet) or an `action` side effect (§4.12). Commands are
-// local and static, so it filters in place — no React Query needed.
-function SlashCommandPlugin({
-  onCommand,
-}: {
-  onCommand: (msg: string) => void;
-}) {
+// A slash-command plugin on its own '/' char (not '@'). It mirrors the mention
+// plugins — confirming a command inserts a tag — but the `command` tag renderer
+// is deliberately lighter than the colored mention pills: no background, just a
+// muted monospace `/name`. Commands are local and static, so it filters in place.
+function SlashCommandPlugin() {
   const { active, query } = useTriggerSlot({ char: "/", id: "slash" });
-  const commands: Command[] = [
-    {
-      hint: "¯\\_(ツ)_/¯",
-      name: "shrug",
-      run: () => ({ insertText: "¯\\_(ツ)_/¯" }),
-    },
-    {
-      hint: "(╯°□°)╯︵ ┻━┻",
-      name: "tableflip",
-      run: () => ({ insertText: "(╯°□°)╯︵ ┻━┻" }),
-    },
-    {
-      hint: "insert the current time",
-      name: "now",
-      run: () => ({ insertText: new Date().toLocaleTimeString() }),
-    },
-    {
-      // `action` runs after the engine has already stripped the `/help` run, so
-      // it is free to drive the editor via the API and fire page-level effects.
-      hint: "list commands (via the action API)",
-      name: "help",
-      run: () => ({
-        action: (api: TriggerEditorAPI) => {
-          api.insertText("Available: /shrug /tableflip /now /help");
-          onCommand("Ran /help");
-        },
-      }),
-    },
-  ];
+  useTagRenderer("command", (d) => (
+    <span
+      data-testid="tag-pill"
+      style={{ color: "#7c3aed", fontFamily: "ui-monospace, monospace" }}
+    >
+      /{String(d.name)}
+    </span>
+  ));
   const q = query.toLowerCase();
-  const matches = commands.filter((c) => c.name.toLowerCase().startsWith(q));
+  const matches = COMMANDS.filter((c) => c.name.toLowerCase().startsWith(q));
   useTriggerSource<Command>({
     char: "/",
     group: "Commands",
     id: "slash",
     items: active ? matches : [],
-    onSelect: (c) => c.run(),
+    onSelect: (c) => ({
+      toNode: () => $createTagNode("command", { name: c.name }),
+    }),
     order: 3,
     renderItem: (c) => (
       <span>
@@ -325,10 +305,9 @@ export default function ChatInputShowcase() {
         </p>
         <p style={{ color: "#666", fontSize: 14 }}>
           Type <code>/</code> at the start of the line for{" "}
-          <strong>slash commands</strong> — a separate trigger char that runs an
-          effect instead of inserting a tag (<code>/shrug</code>,{" "}
-          <code>/now</code> use <code>insertText</code>; <code>/help</code> uses
-          an <code>action</code>).
+          <strong>slash commands</strong> — a separate trigger char that, like a
+          mention, drops a tag on confirm. The <code>command</code> tag is just
+          lighter: no background, a muted monospace <code>/name</code>.
         </p>
         <ChatInput
           charConfig={CHAR_CONFIG}
@@ -338,7 +317,7 @@ export default function ChatInputShowcase() {
           <UserMentionPlugin />
           <FileMentionPlugin />
           <TeamMentionPlugin />
-          <SlashCommandPlugin onCommand={setLast} />
+          <SlashCommandPlugin />
         </ChatInput>
         <pre
           data-testid="payload"
