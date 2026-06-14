@@ -265,8 +265,13 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
     >
       {panel && (
         <li
-          className="flex items-center justify-between px-2 py-1 text-xs text-muted-foreground"
+          className="flex cursor-pointer items-center justify-between rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           data-testid="mention-breadcrumb"
+          // onMouseDown (not onClick) + preventDefault keeps editor focus.
+          onMouseDown={(event) => {
+            event.preventDefault()
+            back()
+          }}
         >
           <span>{trail}</span>
           <span>⌫ back</span>
