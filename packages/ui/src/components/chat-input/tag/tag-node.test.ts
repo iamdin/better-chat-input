@@ -30,6 +30,43 @@ describe('TagNode', () => {
     }, { discrete: true })
   })
 
+  test('exportDOM embeds identity attrs + clean text; importDOM rebuilds the tag', () => {
+    const editor = editorWith()
+    editor.update(
+      () => {
+        const tag = $createTagNode('file', {
+          id: 'f1',
+          name: 'app.tsx',
+          path: '/src/app.tsx',
+          text: '/src/app.tsx',
+        })
+        const { element } = tag.exportDOM()
+        const el = element as HTMLElement
+        // identity is in attributes; body is the clean plain text (no emoji)
+        expect(el.getAttribute('data-lexical-tag-type')).toBe('file')
+        expect(el.textContent).toBe('/src/app.tsx')
+
+        // import side: only our spans are claimed, and they round-trip
+        const map = TagNode.importDOM()
+        const conv = map?.span?.(el)
+        expect(conv).not.toBeNull()
+        const rebuilt = conv?.conversion(el)?.node as TagNode
+        expect($isTagNode(rebuilt)).toBe(true)
+        expect(rebuilt.getTag()).toEqual({
+          tagType: 'file',
+          data: { id: 'f1', name: 'app.tsx', path: '/src/app.tsx', text: '/src/app.tsx' },
+        })
+      },
+      { discrete: true },
+    )
+  })
+
+  test('importDOM ignores ordinary spans', () => {
+    const plain = document.createElement('span')
+    plain.textContent = 'just text'
+    expect(TagNode.importDOM()?.span?.(plain)).toBeNull()
+  })
+
   test('export/import JSON round-trips', () => {
     const editor = editorWith()
     editor.update(() => {

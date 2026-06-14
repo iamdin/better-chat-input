@@ -186,11 +186,13 @@ function FileMentionPlugin() {
     // searchFiles + `loading` above), which renders the menu's "Loading…" state.
     onSelect: (f) => ({
       toNode: () =>
+        // Plain-text copy is the path (useful pasted into code/terminal), not the
+        // 📄 pill — copy text is decoupled from the rendered form.
         $createTagNode("file", {
           id: f.id,
           name: f.name,
           path: f.path,
-          text: `📄${f.name}`,
+          text: f.path,
         }),
     }),
     order: 1,

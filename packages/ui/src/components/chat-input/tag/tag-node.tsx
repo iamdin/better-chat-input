@@ -1,5 +1,7 @@
 import {
   DecoratorNode,
+  type DOMConversionMap,
+  type DOMConversionOutput,
   type DOMExportOutput,
   type EditorConfig,
   type LexicalEditor,
@@ -10,6 +12,27 @@ import {
 } from 'lexical'
 import type { JSX } from 'react'
 import { TagView } from './tag-view'
+
+/** HTML attributes that carry a tag's identity across copy/paste (and any other
+ * text/html boundary), so importDOM can rebuild the node instead of degrading
+ * it to plain text. The element's textContent stays the human-readable form. */
+const TAG_TYPE_ATTR = 'data-lexical-tag-type'
+const TAG_DATA_ATTR = 'data-lexical-tag'
+
+function $convertTagElement(domNode: HTMLElement): DOMConversionOutput {
+  const tagType = domNode.getAttribute(TAG_TYPE_ATTR) ?? 'tag'
+  let data: Record<string, unknown> = {}
+  const raw = domNode.getAttribute(TAG_DATA_ATTR)
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') data = parsed as Record<string, unknown>
+    } catch {
+      // Malformed payload — fall back to an empty-data tag of the right type.
+    }
+  }
+  return { node: $createTagNode(tagType, data) }
+}
 
 export interface TagData {
   tagType: string
@@ -33,6 +56,18 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return $createTagNode(json.tag.tagType, json.tag.data)
   }
 
+  // Paste from text/html (another app, or this editor when the richer
+  // application/x-lexical-editor payload is absent): only claim spans that carry
+  // our identity attributes, so ordinary spans are left alone.
+  static importDOM(): DOMConversionMap | null {
+    return {
+      span: (domNode: HTMLElement) => {
+        if (!domNode.hasAttribute(TAG_TYPE_ATTR)) return null
+        return { conversion: $convertTagElement, priority: 1 }
+      },
+    }
+  }
+
   constructor(tag: TagData, key?: NodeKey) {
     super(key)
     this.__tag = tag
@@ -52,8 +87,12 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return false
   }
 
+  // Copy to text/html: embed the identity so a paste can rebuild the tag, and
+  // keep the human-readable text as the body for plain-text / non-aware targets.
   exportDOM(): DOMExportOutput {
     const element = document.createElement('span')
+    element.setAttribute(TAG_TYPE_ATTR, this.__tag.tagType)
+    element.setAttribute(TAG_DATA_ATTR, JSON.stringify(this.__tag.data))
     element.textContent = this.getTextContent()
     return { element }
   }
@@ -62,9 +101,10 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return <TagView tag={this.getLatest().__tag} />
   }
 
-  // Plain-text form (clipboard / DOM export). The trigger char is not assumed:
-  // a tag carries its own `text` (e.g. "@Alice", "/image", "📄app.tsx"); falls
-  // back to `name`, then the tagType. The renderer owns the *visual* form.
+  // Plain-text form (text/plain clipboard, DOM body). Kept clean and free of the
+  // render's decoration (no emoji/colors): a tag carries its own `text` — e.g.
+  // "@Alice", "/image", or a file's path — falling back to `name`, then tagType.
+  // The renderer owns the *visual* form; this owns the *textual* one.
   getTextContent(): string {
     const { text, name } = this.__tag.data
     if (typeof text === 'string') return text
