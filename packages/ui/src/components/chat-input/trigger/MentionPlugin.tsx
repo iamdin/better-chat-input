@@ -8,7 +8,11 @@ import {
   COMMAND_PRIORITY_CRITICAL,
   COMMAND_PRIORITY_LOW,
   KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_ARROW_UP_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
@@ -19,20 +23,24 @@ import { $createTagNode } from '../tag/TagNode'
 import { matchTrigger } from './match'
 import type { MentionConfig, MentionGroup, MentionItem } from './types'
 
-/** Separator that encodes a drill path inside the query text, e.g. "Team/al". */
-const PATH_SEP = '/'
+/** A drilled level whose filter query lives in component state, not in the text. */
+interface PanelLevel {
+  label: string
+  /** Raw child groups; filtered by `query` for display. */
+  groups: MentionGroup[]
+  /** Panel-local search term (typed while inside this level). */
+  query: string
+}
 
 interface MenuState {
   config: MentionConfig
-  /** Offset where the trigger char starts (for replacing on insert/drill). */
+  /** Offset where the trigger char starts (for replacing on insert). */
   matchStart: number
   rect: { top: number; left: number } | null
-  /** Current level, already filtered by the trailing query segment. */
-  groups: MentionGroup[]
-  /** Chosen branch names leading to this level (for the breadcrumb). */
-  parentNames: string[]
-  /** The trailing query segment (text after the last separator). */
-  query: string
+  /** Level 0, driven by the editor text (already filtered by config.search). */
+  baseGroups: MentionGroup[]
+  /** Drilled levels above level 0; empty means we are at level 0. */
+  panels: PanelLevel[]
 }
 
 function flatten(groups: MentionGroup[]): MentionItem[] {
@@ -55,39 +63,22 @@ function filterGroups(groups: MentionGroup[], query: string): MentionGroup[] {
     .filter((g) => g.items.length > 0)
 }
 
-/**
- * Resolve a raw query (which may encode a drill path like "Team Alpha/al") into
- * the groups to show at the current level. Returns null when the path no longer
- * points at a real branch. Level 0 delegates filtering to config.search; deeper
- * levels filter drill() results by the trailing segment here.
- */
-function resolve(
-  config: MentionConfig,
-  raw: string,
-): { groups: MentionGroup[]; parentNames: string[]; query: string } | null {
-  const segs = raw.split(PATH_SEP)
-  const query = segs[segs.length - 1] ?? ''
-  const parentNames = segs.slice(0, -1)
-  if (parentNames.length === 0) {
-    return { groups: config.search(query), parentNames, query }
-  }
-  // Walk the parent chain from the unfiltered level-0 results.
-  let groups = config.search('')
-  for (const name of parentNames) {
-    const parent = flatten(groups).find((it) => it.name === name)
-    if (!parent) return null
-    const child = config.drill?.(parent)
-    if (!child) return null
-    groups = child
-  }
-  return { groups: filterGroups(groups, query), parentNames, query }
+/** The groups visible at the current level. */
+function currentGroups(m: MenuState): MentionGroup[] {
+  if (m.panels.length === 0) return m.baseGroups
+  const last = m.panels[m.panels.length - 1]
+  return last ? filterGroups(last.groups, last.query) : []
 }
 
 /**
- * Self-built trigger menu (Folo-style, no official TypeaheadMenuPlugin) with
- * grouped results and cascading selection. The drill path lives entirely in the
- * query text: choosing a branch appends "<name>/", so typing keeps filtering the
- * deeper level and Backspace naturally steps back out — no keys are hijacked.
+ * Self-built trigger menu (Folo-style) with grouped results and Raycast-style
+ * cascading: level 0 is driven by the editor text (`@query`), and drilling into
+ * a branch opens a panel whose filter lives in component state — the input stays
+ * a clean `@`. Keys: ↑↓ navigate, →/Enter/Tab drill-or-select, ← back, Esc close,
+ * and inside a panel Backspace deletes the panel query or (when empty) steps back.
+ *
+ * Note: panel-level typing is captured via keydown, so panel search is Latin-key
+ * only; IME composition search works at level 0 (the text-driven level).
  */
 export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
   const [editor] = useLexicalComposerContext()
@@ -108,27 +99,26 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
 
   const currentItems = useCallback(() => {
     const m = menuRef.current
-    return m ? flatten(m.groups) : []
+    return m ? flatten(currentGroups(m)) : []
   }, [])
 
-  // Replace the "@…run…" before the caret with `text`, caret placed after it.
-  const rewriteQuery = useCallback(
-    (text: string) => {
-      const m = menuRef.current
-      if (!m) return
-      editor.update(() => {
-        const sel = $getSelection()
-        if (!$isRangeSelection(sel) || !sel.isCollapsed()) return
-        const node = sel.anchor.getNode()
-        if (!$isTextNode(node)) return
-        const end = sel.anchor.offset
-        if (m.matchStart < 0 || m.matchStart > end) return
-        sel.setTextNodeRange(node, m.matchStart, node, end)
-        sel.insertText(text)
-      })
-    },
-    [editor],
-  )
+  const setPanelQuery = useCallback((fn: (q: string) => string) => {
+    setMenu((m) => {
+      if (!m || m.panels.length === 0) return m
+      const panels = m.panels.slice()
+      const i = panels.length - 1
+      const last = panels[i]
+      if (!last) return m
+      panels[i] = { ...last, query: fn(last.query) }
+      return { ...m, panels }
+    })
+    setActive(0)
+  }, [])
+
+  const popPanel = useCallback(() => {
+    setMenu((m) => (m && m.panels.length ? { ...m, panels: m.panels.slice(0, -1) } : m))
+    setActive(0)
+  }, [])
 
   const insertTag = useCallback(
     (item: MentionItem) => {
@@ -157,22 +147,44 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
     (item: MentionItem) => {
       const m = menuRef.current
       if (!m) return
-      if (hasChildren(m.config, item)) {
-        // Drill: append "<name>/" so the next detection shows the children.
-        const path = [...m.parentNames, item.name].join(PATH_SEP)
-        rewriteQuery(`${m.config.trigger}${path}${PATH_SEP}`)
-      } else {
+      if (!hasChildren(m.config, item)) {
         insertTag(item)
+        return
       }
+      const child = m.config.drill?.(item)
+      if (!child) return
+      const next: MenuState = {
+        ...m,
+        panels: [...m.panels, { label: item.name, groups: child, query: '' }],
+      }
+      // Entering the first panel: collapse the level-0 query back to a bare
+      // trigger so the input stays clean. Sync menuRef first so the resulting
+      // update is seen as panel mode and detection freezes instead of resetting.
+      if (m.panels.length === 0) {
+        menuRef.current = next
+        editor.update(() => {
+          const sel = $getSelection()
+          if (!$isRangeSelection(sel) || !sel.isCollapsed()) return
+          const node = sel.anchor.getNode()
+          if (!$isTextNode(node)) return
+          const end = sel.anchor.offset
+          if (m.matchStart < 0 || m.matchStart > end) return
+          sel.setTextNodeRange(node, m.matchStart, node, end)
+          sel.insertText(m.config.trigger)
+        })
+      }
+      setMenu(next)
+      setActive(0)
     },
-    [rewriteQuery, insertTag],
+    [editor, insertTag],
   )
 
-  // Detection: re-resolve the menu from the text on every edit. Backspace and
-  // typing flow through here, so stepping back/forward is just text editing.
+  // Level-0 detection: re-resolve from the editor text. Frozen while a panel is
+  // open (panel typing is captured separately and the text is held at `@`).
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState }) => {
       if (editor.isComposing()) return
+      if (menuRef.current && menuRef.current.panels.length > 0) return
       const found = editorState.read(() => {
         const sel = $getSelection()
         if (!$isRangeSelection(sel) || !sel.isCollapsed()) return null
@@ -185,7 +197,7 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         if (!matched) return null
         return {
           config: matched.config,
-          raw: matched.query,
+          query: matched.query,
           matchStart: anchor.offset - matched.matched.length,
         }
       })
@@ -193,14 +205,8 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         if (menuRef.current) close()
         return
       }
-      const resolved = resolve(found.config, found.raw)
-      // Close when the path is invalid, or when level 0 has no candidates (so
-      // typing ordinary text after a bare trigger doesn't leave a stuck menu).
-      if (
-        !resolved ||
-        (resolved.parentNames.length === 0 &&
-          flatten(resolved.groups).length === 0)
-      ) {
+      const baseGroups = found.config.search(found.query)
+      if (flatten(baseGroups).length === 0) {
         if (menuRef.current) close()
         return
       }
@@ -214,19 +220,37 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         config: found.config,
         matchStart: found.matchStart,
         rect,
-        groups: resolved.groups,
-        parentNames: resolved.parentNames,
-        query: resolved.query,
+        baseGroups,
+        panels: [],
       })
-      // Typing/drilling changes the list; highlight the first item.
       setActive(0)
     })
   }, [editor, close])
 
-  // Keyboard: only menu navigation is intercepted. Text keys (incl. Backspace)
-  // are intentionally left to the editor so the path query can be edited freely.
+  // Keyboard. Level 0 leaves text keys to the editor; a panel captures typing
+  // (Latin keys) and Backspace so its query can be edited without touching text.
   useEffect(() => {
     return mergeRegister(
+      // Capture printable keys as panel-query input while a panel is open.
+      editor.registerCommand(
+        KEY_DOWN_COMMAND,
+        (event) => {
+          const m = menuRef.current
+          if (!m || m.panels.length === 0) return false
+          if (
+            event.key.length === 1 &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey
+          ) {
+            event.preventDefault()
+            setPanelQuery((q) => q + event.key)
+            return true
+          }
+          return false
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
       editor.registerCommand(
         KEY_ARROW_DOWN_COMMAND,
         (event) => {
@@ -246,6 +270,36 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
           event?.preventDefault()
           setActive((a) => (a - 1 + list.length) % list.length)
           return true
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+      // ArrowRight drills into the active branch (works at any level).
+      editor.registerCommand(
+        KEY_ARROW_RIGHT_COMMAND,
+        (event) => {
+          const m = menuRef.current
+          if (!m) return false
+          const item = currentItems()[activeRef.current]
+          if (item && hasChildren(m.config, item)) {
+            event?.preventDefault()
+            choose(item)
+            return true
+          }
+          return false
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+      // ArrowLeft steps back out of a panel.
+      editor.registerCommand(
+        KEY_ARROW_LEFT_COMMAND,
+        (event) => {
+          const m = menuRef.current
+          if (m && m.panels.length > 0) {
+            event?.preventDefault()
+            popPanel()
+            return true
+          }
+          return false
         },
         COMMAND_PRIORITY_LOW,
       ),
@@ -272,6 +326,24 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         },
         COMMAND_PRIORITY_CRITICAL,
       ),
+      // Inside a panel, Backspace edits the panel query, then steps back when
+      // it is empty. At level 0 it falls through to normal text deletion.
+      editor.registerCommand(
+        KEY_BACKSPACE_COMMAND,
+        (event) => {
+          const m = menuRef.current
+          if (!m || m.panels.length === 0) return false
+          event?.preventDefault()
+          const last = m.panels[m.panels.length - 1]
+          if (last && last.query.length > 0) {
+            setPanelQuery((q) => q.slice(0, -1))
+          } else {
+            popPanel()
+          }
+          return true
+        },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
       editor.registerCommand(
         KEY_ESCAPE_COMMAND,
         () => {
@@ -282,12 +354,17 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         COMMAND_PRIORITY_CRITICAL,
       ),
     )
-  }, [editor, choose, close, currentItems])
+  }, [editor, choose, close, popPanel, setPanelQuery, currentItems])
 
   if (!menu || !menu.rect) return null
-  const flat = flatten(menu.groups)
-  const trail = menu.parentNames.length
-    ? `${menu.config.trigger}${menu.parentNames.join(' › ')}`
+  const groups = currentGroups(menu)
+  const flat = flatten(groups)
+  const panel = menu.panels.length > 0
+  const trail = panel
+    ? `${menu.config.trigger}${menu.panels.map((p) => p.label).join(' › ')}`
+    : ''
+  const panelQuery = panel
+    ? (menu.panels[menu.panels.length - 1]?.query ?? '')
     : ''
 
   return createPortal(
@@ -301,18 +378,21 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
         zIndex: 50,
       }}
     >
-      {trail && (
+      {panel && (
         <li
-          className="px-2 py-1 text-xs text-muted-foreground"
+          className="flex items-center justify-between gap-2 px-2 py-1 text-xs text-muted-foreground"
           data-testid="mention-breadcrumb"
         >
-          {trail} ›
+          <span>‹ {trail}</span>
+          <span className="text-foreground">
+            {panelQuery || <span className="text-muted-foreground">type to filter…</span>}
+          </span>
         </li>
       )}
       {flat.length === 0 ? (
         <li className="px-2 py-1.5 text-muted-foreground">No results</li>
       ) : (
-        menu.groups.map((group, gi) => (
+        groups.map((group, gi) => (
           <Fragment key={group.label ?? `group-${gi}`}>
             {group.label && (
               <li

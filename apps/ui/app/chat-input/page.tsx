@@ -47,9 +47,9 @@ export default function ChatInputShowcase() {
       <h1>ChatInput</h1>
       <p style={{ color: "#666", fontSize: 14 }}>
         Grouped results (<b>Teams</b> / <b>People</b>) with cascading selection:
-        choosing a team drills into its members — keep typing to filter the
-        members, and Backspace steps back out. ↑↓ navigate · Enter / Tab select
-        or drill · Esc close.
+        choosing a team drills into its members — inside a team, just type to
+        filter. ↑↓ navigate · → / Enter drill or select · ← / Backspace back ·
+        Esc close.
       </p>
       <ChatInput
         mentions={[

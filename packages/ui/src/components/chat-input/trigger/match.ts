@@ -5,9 +5,8 @@ export interface TriggerMatch {
   /** The full matched run including the trigger char, e.g. "@Team Alpha/al". */
   matched: string
   /**
-   * The raw query after the trigger char. It may encode a drill path with '/'
-   * separators and contain spaces, e.g. "Team Alpha/al". Path parsing is done
-   * by the caller; here we only delimit the run.
+   * The query after the trigger char. May contain spaces so multi-word names
+   * work, e.g. "Team Alpha". The caller decides if it resolves to candidates.
    */
   query: string
 }
@@ -20,10 +19,10 @@ function escapeRegExp(s: string): string {
  * Match an active trigger at the end of the text preceding the caret.
  * A trigger fires only at the start of input or right after whitespace. The
  * query then runs until the caret and MAY contain spaces (so multi-word names
- * and "parent/child" drill paths work) — it stops only at a newline or another
- * trigger char, which anchors the match to the most recent trigger. Whether the
- * query actually resolves to candidates is decided by the caller. Returns the
- * first config that matches, or null.
+ * like "Team Alpha" work) — it stops only at a newline or another trigger char,
+ * which anchors the match to the most recent trigger. Whether the query actually
+ * resolves to candidates is decided by the caller. Returns the first config that
+ * matches, or null.
  */
 export function matchTrigger(
   textToCursor: string,

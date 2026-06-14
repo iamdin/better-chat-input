@@ -22,8 +22,7 @@ export interface MentionConfig {
   tagType: string
   /**
    * First-level results, as one or more groups. You filter by `query` yourself
-   * (it is the level-0 search term). Called with '' to enumerate all branches
-   * when resolving a drill path.
+   * (it is the level-0 search term typed right after the trigger).
    */
   search: (query: string) => MentionGroup[]
   /**

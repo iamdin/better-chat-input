@@ -41,9 +41,9 @@ describe('matchTrigger', () => {
     expect(m?.matched).toBe('@Team Alpha')
   })
 
-  test('keeps a drill path with slashes', () => {
-    const m = matchTrigger('@Team Alpha/al', configs)
-    expect(m?.query).toBe('Team Alpha/al')
+  test('keeps punctuation such as slashes in the query', () => {
+    const m = matchTrigger('@a/b', configs)
+    expect(m?.query).toBe('a/b')
   })
 
   test('anchors to the most recent trigger', () => {
