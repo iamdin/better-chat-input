@@ -151,7 +151,8 @@ function UserMentionPlugin() {
     items: data ?? [],
     loading: isLoading,
     onSelect: (u) => ({
-      toNode: () => $createTagNode("user", { id: u.id, name: u.name }),
+      toNode: () =>
+        $createTagNode("user", { id: u.id, name: u.name, text: `@${u.name}` }),
     }),
     order: 0,
     renderItem: (u) => <span>@{u.name}</span>,
@@ -185,7 +186,12 @@ function FileMentionPlugin() {
     // searchFiles + `loading` above), which renders the menu's "Loading…" state.
     onSelect: (f) => ({
       toNode: () =>
-        $createTagNode("file", { id: f.id, name: f.name, path: f.path }),
+        $createTagNode("file", {
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          text: `📄${f.name}`,
+        }),
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,
@@ -223,6 +229,7 @@ function TeamMentionPlugin() {
           $createTagNode("team-member", {
             id: (m as Member).id,
             name: (m as Member).name,
+            text: `@${(m as Member).name}`,
           }),
       }),
       renderItem: (m) => <span>@{(m as Member).name}</span>,
@@ -259,7 +266,8 @@ function SlashCommandPlugin() {
     id: "slash",
     items: active ? matches : [],
     onSelect: (c) => ({
-      toNode: () => $createTagNode("command", { name: c.name }),
+      toNode: () =>
+        $createTagNode("command", { name: c.name, text: `/${c.name}` }),
     }),
     order: 3,
     renderItem: (c) => (

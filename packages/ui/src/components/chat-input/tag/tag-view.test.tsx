@@ -20,13 +20,22 @@ describe('TagView', () => {
     expect(screen.getByTestId('custom').textContent).toBe('USER:Alice')
   })
 
-  test('falls back to plaintext when no renderer is registered', () => {
+  test('falls back to the tag\'s own text when no renderer is registered', () => {
+    render(
+      <TagProvider>
+        <TagView tag={{ tagType: 'command', data: { name: 'image', text: '/image' } }} />
+      </TagProvider>,
+    )
+    expect(screen.getByText('/image')).toBeDefined()
+  })
+
+  test('falls back to name (no assumed prefix) when there is no text', () => {
     render(
       <TagProvider>
         <TagView tag={{ tagType: 'file', data: { name: 'app.tsx' } }} />
       </TagProvider>,
     )
-    expect(screen.getByText('@app.tsx')).toBeDefined()
+    expect(screen.getByText('app.tsx')).toBeDefined()
   })
 
   test('falls back to tagType when name is absent', () => {
@@ -35,6 +44,6 @@ describe('TagView', () => {
         <TagView tag={{ tagType: 'mystery', data: {} }} />
       </TagProvider>,
     )
-    expect(screen.getByText('@mystery')).toBeDefined()
+    expect(screen.getByText('mystery')).toBeDefined()
   })
 })

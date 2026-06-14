@@ -7,6 +7,9 @@ export function TagView({ tag }: { tag: TagData }): JSX.Element {
   if (render) {
     return <>{render(tag.data)}</>
   }
-  const name = tag.data.name
-  return <span className="tag-fallback">@{typeof name === 'string' ? name : tag.tagType}</span>
+  // No renderer registered: show the tag's own plain text (no assumed prefix).
+  const { text, name } = tag.data
+  const label =
+    typeof text === 'string' ? text : typeof name === 'string' ? name : tag.tagType
+  return <span className="tag-fallback">{label}</span>
 }

@@ -8,12 +8,17 @@ function editorWith() {
 }
 
 describe('TagNode', () => {
-  test('getTextContent renders @name', () => {
+  test('getTextContent prefers the tag\'s own text, then name, then tagType', () => {
     const editor = editorWith()
     editor.update(() => {
-      const tag = $createTagNode('user', { id: '1', name: 'Alice' })
-      expect(tag.getTextContent()).toBe('@Alice')
-      expect($isTagNode(tag)).toBe(true)
+      // explicit text wins — the trigger char is not assumed
+      expect($createTagNode('user', { name: 'Alice', text: '@Alice' }).getTextContent()).toBe('@Alice')
+      expect($createTagNode('command', { name: 'image', text: '/image' }).getTextContent()).toBe('/image')
+      // falls back to name (no hardcoded '@')
+      expect($createTagNode('file', { name: 'app.tsx' }).getTextContent()).toBe('app.tsx')
+      // falls back to tagType when neither is present
+      expect($createTagNode('mystery', {}).getTextContent()).toBe('mystery')
+      expect($isTagNode($createTagNode('user', { name: 'Alice' }))).toBe(true)
     }, { discrete: true })
   })
 

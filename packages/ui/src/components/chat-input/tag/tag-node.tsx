@@ -62,9 +62,14 @@ export class TagNode extends DecoratorNode<JSX.Element> {
     return <TagView tag={this.getLatest().__tag} />
   }
 
+  // Plain-text form (clipboard / DOM export). The trigger char is not assumed:
+  // a tag carries its own `text` (e.g. "@Alice", "/image", "📄app.tsx"); falls
+  // back to `name`, then the tagType. The renderer owns the *visual* form.
   getTextContent(): string {
-    const name = this.__tag.data.name
-    return `@${typeof name === 'string' ? name : this.__tag.tagType}`
+    const { text, name } = this.__tag.data
+    if (typeof text === 'string') return text
+    if (typeof name === 'string') return name
+    return this.__tag.tagType
   }
 
   exportJSON(): SerializedTagNode {

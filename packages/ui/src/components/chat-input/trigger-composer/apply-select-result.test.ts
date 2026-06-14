@@ -43,7 +43,8 @@ describe('async selection (NodeKey anchoring, spec §4.8)', () => {
       const para = $getRoot().getFirstChild()!
       const first = para.getFirstChild()
       expect($isTagNode(first)).toBe(true)
-      expect(para.getTextContent()).toBe('@… ') // placeholder + trailing space
+      // placeholder (name '…', no explicit text) + trailing space; no assumed '@'
+      expect(para.getTextContent()).toBe('… ')
     })
   })
 
