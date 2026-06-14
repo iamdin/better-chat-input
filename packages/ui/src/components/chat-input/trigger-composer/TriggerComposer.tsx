@@ -22,7 +22,8 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { matchTrigger } from '../trigger/match'
+import { $isTagNode } from '../tag/TagNode'
+import { type CharMatchConfig, matchTrigger } from '../trigger/match'
 import { applySelectResult, type SelectResult } from './apply-select-result'
 import {
   TriggerComposerContext,
@@ -48,8 +49,19 @@ interface MenuGroup {
  * source's SelectResult. Trigger plugins self-register via useTriggerSource /
  * useTriggerSlot — there is no central config array.
  */
-export function TriggerComposer({ children }: { children?: ReactNode }) {
+export function TriggerComposer({
+  children,
+  charConfig,
+}: {
+  children?: ReactNode
+  /** Per-char query matching (CJK boundary, stopOnWhitespace, custom pattern). */
+  charConfig?: Record<string, CharMatchConfig>
+}) {
   const [editor] = useLexicalComposerContext()
+
+  // Latest charConfig without re-subscribing the detection listener.
+  const charConfigRef = useRef(charConfig)
+  charConfigRef.current = charConfig
 
   // Source registry: mutable ref + a version that only re-renders the menu (not
   // slot consumers), so per-render item churn stays cheap (spec §4.4).
@@ -183,12 +195,16 @@ export function TriggerComposer({ children }: { children?: ReactNode }) {
         const node = anchor.getNode()
         if (!$isTextNode(node)) return null
         const textToCursor = node.getTextContent().slice(0, anchor.offset)
-        const matched = matchTrigger(textToCursor, triggers)
+        const matched = matchTrigger(textToCursor, triggers, charConfigRef.current)
         if (!matched) return null
+        const leadOffset = anchor.offset - matched.matched.length
+        // Suppress @tag@ chains: a trigger at the very start of a text node that
+        // directly follows a TagNode does not activate (spec §4.6 / §5.3).
+        if (leadOffset === 0 && $isTagNode(node.getPreviousSibling())) return null
         return {
           char: matched.char,
           query: matched.query,
-          matchStart: anchor.offset - matched.matched.length,
+          matchStart: leadOffset,
         }
       })
       if (!found) {

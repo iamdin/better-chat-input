@@ -13,6 +13,7 @@ import { useTagRenderer } from './tag/use-tag-renderer'
 import type { TagRenderer } from './tag/TagProvider'
 import { SubmitPlugin } from './plugins/SubmitPlugin'
 import { TriggerComposer } from './trigger-composer/TriggerComposer'
+import type { CharMatchConfig } from './trigger/match'
 import type { SubmitPayload } from './serializer/types'
 
 export interface TagRendererSpec {
@@ -30,6 +31,8 @@ export interface ChatInputProps {
    * TriggerComposer. Each self-registers its source — there is no config array.
    */
   children?: ReactNode
+  /** Per-char query matching shared across sources of that char (spec §4.6). */
+  charConfig?: Record<string, CharMatchConfig>
   /** Exposes the underlying editor once mounted (used by demos and E2E tests). */
   onReady?: (editor: LexicalEditor) => void
 }
@@ -66,6 +69,7 @@ export function ChatInput({
   placeholder = '',
   tagRenderers = [],
   children,
+  charConfig,
   onReady,
 }: ChatInputProps) {
   return (
@@ -96,7 +100,7 @@ export function ChatInput({
           <HistoryPlugin />
           <ClearEditorPlugin />
           <SubmitPlugin enterBehavior={enterBehavior} onSubmit={onSubmit} />
-          <TriggerComposer>{children}</TriggerComposer>
+          <TriggerComposer charConfig={charConfig}>{children}</TriggerComposer>
         </div>
       </LexicalComposer>
     </TagProvider>
