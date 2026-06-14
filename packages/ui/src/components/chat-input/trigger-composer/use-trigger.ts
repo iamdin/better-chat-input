@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useTagRenderer } from '../tag/use-tag-renderer'
 import type { PendingSelect, SelectResult } from './apply-select-result'
 import { type CascadeLevel, useTriggerComposerContext } from './context'
 
@@ -39,6 +40,15 @@ export interface UseTriggerConfig<T> {
    */
   useItems?: (query: string, active: boolean) => TriggerItems<T>
   renderItem?: (item: T) => ReactNode
+  /**
+   * Convenience: register this plugin's tag appearance here too, so a trigger and
+   * its tag are declared in one place. `tagType` is the tag this plugin produces;
+   * `renderTag(data)` draws the inserted pill (distinct from `renderItem`, which
+   * draws the menu row). For tags that must render with no trigger mounted
+   * (drafts, paste, read-only views), call `useTagRenderer` directly instead.
+   */
+  tagType?: string
+  renderTag?: (data: Record<string, unknown>) => ReactNode
   /** Leaf action for a flat source. Omit when the source is a cascade. */
   onSelect?: (item: T) => SelectResult | PendingSelect
   /**
@@ -67,6 +77,9 @@ export function useTrigger<T = unknown>(config: UseTriggerConfig<T>): TriggerSlo
 
   const active = engine.activeChar === char
   const query = active ? engine.query : ''
+
+  // Co-locate the tag renderer (no-op unless tagType + renderTag are given).
+  useTagRenderer(config.tagType, config.renderTag)
 
   // Static identity — registers once, removes on unmount.
   useEffect(() => engine.register(id, char, order), [engine, id, char, order])

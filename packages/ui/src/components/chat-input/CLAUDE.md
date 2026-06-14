@@ -12,19 +12,22 @@ file is the working guide for anyone (human or agent) editing this directory.
   holds the source registry, merges all sources sharing the active char into one
   menu, drives keyboard nav, positions the menu, and applies the chosen result.
 - A trigger = a **self-registering plugin component**, never a config array
-  (spec §3 forbids the config-array god-component). A plugin composes two hooks:
+  (spec §3 forbids the config-array god-component). A plugin declares everything
+  in one `useTrigger` call:
   - `useTrigger({ char, id, group?, order?, renderItem, onSelect | getChildren,
-    useItems })` → `{ active, query, select, close }`. This one hook subscribes
-    to the engine AND registers the source. `useItems(query, active)` is where
-    the candidates come from: it is itself a hook, so you call
-    `useQuery({ enabled: active })` keyed on `query` inside it — that resolves the
-    cycle where items depend on the query the hook returns. A source is **flat**
-    (`onSelect` per item) or **cascade** (`getChildren(item)` → `CascadeLevel`);
-    both coexist in the merged menu (branches show a `›`, drill on → / Enter, step
-    back on ← / Backspace, filter a drilled level via its `match`, spec §4.11).
-  - `useTagRenderer(tagType, render)` — kept separate on purpose: rendering is
-    decoupled from trigger presence (a tag renders from a saved draft / paste /
-    read-only view with no trigger mounted).
+    tagType?, renderTag?, useItems })` → `{ active, query, select, close }`. This
+    one hook subscribes to the engine, registers the source, AND (via
+    `tagType` + `renderTag`) registers the tag's appearance — trigger, source,
+    and renderer in one place. `useItems(query, active)` is where the candidates
+    come from: it is itself a hook, so you call `useQuery({ enabled: active })`
+    keyed on `query` inside it — that resolves the cycle where items depend on
+    the query the hook returns. A source is **flat** (`onSelect` per item) or
+    **cascade** (`getChildren(item)` → `CascadeLevel`); both coexist in the
+    merged menu (branches show a `›`, drill on → / Enter, step back on ←
+    / Backspace, filter a drilled level via its `match`, spec §4.11).
+  - `useTagRenderer(tagType, render)` is the underlying primitive (what
+    `renderTag` calls). Use it directly only when a tag must render with **no
+    trigger mounted** — a saved draft, a paste, a read-only view.
   - For arbitrary, non-menu UI use the escape hatch: `useTrigger({ kind: 'custom' })`
     (omit `useItems`) + draw your own panel with `useTypeaheadKeyboard`. (Mixing
     `menu` and `custom` on the same char is forbidden, §4.5 — declarative cascade

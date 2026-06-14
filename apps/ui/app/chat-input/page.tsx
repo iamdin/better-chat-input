@@ -4,7 +4,6 @@ import {
   $createTagNode,
   type CharMatchConfig,
   ChatInput,
-  useTagRenderer,
   useTrigger,
 } from "@coss/ui/components/chat-input";
 import {
@@ -159,14 +158,6 @@ const queryClient = new QueryClient();
 // them into one menu (spec §4.3). Users and Files are flat groups; Teams is a
 // cascade source whose items drill into members, all in the same menu (§4.11).
 function UserMentionPlugin() {
-  useTagRenderer("user", (d) => (
-    <span
-      data-testid="tag-pill"
-      style={{ background: "#e0ecff", borderRadius: 4, padding: "0 4px" }}
-    >
-      @{String(d.name)}
-    </span>
-  ));
   useTrigger<User>({
     char: "@",
     group: "Users",
@@ -177,20 +168,21 @@ function UserMentionPlugin() {
     }),
     order: 0,
     renderItem: (u) => <span>@{u.name}</span>,
+    renderTag: (d) => (
+      <span
+        data-testid="tag-pill"
+        style={{ background: "#e0ecff", borderRadius: 4, padding: "0 4px" }}
+      >
+        @{String(d.name)}
+      </span>
+    ),
+    tagType: "user",
     useItems: useUserItems,
   });
   return null;
 }
 
 function FileMentionPlugin() {
-  useTagRenderer("file", (d) => (
-    <span
-      data-testid="tag-pill"
-      style={{ background: "#e0ffe8", borderRadius: 4, padding: "0 4px" }}
-    >
-      📄{String(d.name)}
-    </span>
-  ));
   useTrigger<FileItem>({
     char: "@",
     group: "Files",
@@ -211,6 +203,15 @@ function FileMentionPlugin() {
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,
+    renderTag: (d) => (
+      <span
+        data-testid="tag-pill"
+        style={{ background: "#e0ffe8", borderRadius: 4, padding: "0 4px" }}
+      >
+        📄{String(d.name)}
+      </span>
+    ),
+    tagType: "file",
     useItems: useFileItems,
   });
   return null;
@@ -220,14 +221,6 @@ function FileMentionPlugin() {
 // the flat groups above, but its items drill into team members. The engine
 // renders the breadcrumb, drives → / ← / type-to-filter — no custom panel.
 function TeamMentionPlugin() {
-  useTagRenderer("team-member", (d) => (
-    <span
-      data-testid="tag-pill"
-      style={{ background: "#ffe8d6", borderRadius: 4, padding: "0 4px" }}
-    >
-      @{String(d.name)}
-    </span>
-  ));
   useTrigger<Team>({
     char: "@",
     getChildren: (t) => ({
@@ -249,6 +242,15 @@ function TeamMentionPlugin() {
     id: "team",
     order: 2,
     renderItem: (t) => <span>👥 {t.name}</span>,
+    renderTag: (d) => (
+      <span
+        data-testid="tag-pill"
+        style={{ background: "#ffe8d6", borderRadius: 4, padding: "0 4px" }}
+      >
+        @{String(d.name)}
+      </span>
+    ),
+    tagType: "team-member",
     useItems: useTeamItems,
   });
   return null;
@@ -259,14 +261,6 @@ function TeamMentionPlugin() {
 // is deliberately lighter than the colored mention pills: no background, just a
 // muted monospace `/name`. Commands are local and static, so it filters in place.
 function SlashCommandPlugin() {
-  useTagRenderer("command", (d) => (
-    <span
-      data-testid="tag-pill"
-      style={{ color: "#7c3aed", fontFamily: "ui-monospace, monospace" }}
-    >
-      /{String(d.name)}
-    </span>
-  ));
   useTrigger<Command>({
     char: "/",
     group: "Commands",
@@ -282,6 +276,15 @@ function SlashCommandPlugin() {
         <span style={{ color: "#888" }}>{c.hint}</span>
       </span>
     ),
+    renderTag: (d) => (
+      <span
+        data-testid="tag-pill"
+        style={{ color: "#7c3aed", fontFamily: "ui-monospace, monospace" }}
+      >
+        /{String(d.name)}
+      </span>
+    ),
+    tagType: "command",
     // Local + static: no fetch, just filter the fixed list by the query.
     useItems: (query, active) => {
       const q = query.toLowerCase();
