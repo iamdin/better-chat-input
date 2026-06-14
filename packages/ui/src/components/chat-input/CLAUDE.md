@@ -53,36 +53,15 @@ in tests) runs and commits synchronously with `discrete: true`. A **nested**
 return value. Tests don't hit the nested case, so they won't catch this class of
 bug — verify selection flows in the browser too.
 
-## Browser verification (agent-browser) — pitfalls
+## Browser verification (agent-browser)
 
-The demo runs at `http://localhost:4000/ui/chat-input` (Next basePath `/ui`).
-Lexical fully controls the contentEditable via `beforeinput`, which makes
-synthetic events unreliable. Hard-won rules:
-
-1. **Synthetic keydown drops `keyCode`/`which`.** `agent-browser press Enter` /
-   `press ArrowRight` send a KeyboardEvent without `keyCode`/`which`, and
-   Lexical's `KEY_*_COMMAND` never fire — the key looks dead. Dispatch a
-   complete event instead:
-   ```js
-   el.dispatchEvent(new KeyboardEvent('keydown', {
-     key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-     bubbles: true, cancelable: true,
-   }))
-   // ArrowRight: key/code 'ArrowRight', keyCode/which 39
-   ```
-2. **Synthetic keydown does NOT fire the follow-up `beforeinput`.** A Backspace
-   handler that returns `true` without `event.preventDefault()` looks fine under
-   synthetic dispatch but really deletes text under a trusted keypress. Always
-   `preventDefault()` when a handler consumes a key, and verify deletion/typing
-   with **trusted** input: `agent-browser keyboard type "..."` (real
-   `insertText`).
-3. **You cannot delete Lexical-controlled DOM with `execCommand` /
-   `Selection.modify`.** Trailing spaces, DecoratorNodes, etc. survive — Lexical
-   reconciles them back. Scenarios that need a trusted Backspace (e.g. gluing a
-   trigger directly onto a tag to test `@tag@` suppression) can't be reproduced
-   this way; cover them with headless unit tests instead.
-4. Use trusted `keyboard type` for text; reserve dispatched keydown for
-   navigation/selection keys; re-`snapshot` after DOM changes.
+Detection/positioning, merged menu, cascade drill, keyboard nav, IME, and async
+selection can't be unit-tested — verify them in a real browser. The full
+per-capability recipes and the synthetic-event traps live in the
+**verify-chat-input** skill (`.claude/skills/verify-chat-input/`). The one trap
+to remember inline: `agent-browser press Enter`/`ArrowRight` drop `keyCode`/
+`which` so Lexical's `KEY_*_COMMAND` never fire — dispatch a complete
+`KeyboardEvent` for nav/selection keys, and use trusted `keyboard type` for text.
 
 React Query lives only in the plugin layer (apps/ui); the engine has no RQ
 dependency. Don't add one here.
