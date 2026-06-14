@@ -74,10 +74,16 @@ export function ChatInput({
       >
         <TagRenderers specs={tagRenderers} />
         <OnReady onReady={onReady} />
-        <div className="chat-input">
+        <div className="relative rounded-md border border-input bg-transparent text-sm focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
           <RichTextPlugin
-            contentEditable={<ContentEditable className="chat-input__editable" />}
-            placeholder={<div className="chat-input__placeholder">{placeholder}</div>}
+            contentEditable={
+              <ContentEditable className="min-h-20 w-full px-3 py-2 outline-none" />
+            }
+            placeholder={
+              <div className="pointer-events-none absolute left-3 top-2 select-none text-muted-foreground">
+                {placeholder}
+              </div>
+            }
             ErrorBoundary={LexicalErrorBoundary}
           />
           <HistoryPlugin />
