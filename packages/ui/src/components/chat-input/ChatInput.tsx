@@ -12,6 +12,8 @@ import { TagProvider } from './tag/TagProvider'
 import { useTagRenderer } from './tag/use-tag-renderer'
 import type { TagRenderer } from './tag/TagProvider'
 import { SubmitPlugin } from './plugins/SubmitPlugin'
+import { MentionPlugin } from './trigger/MentionPlugin'
+import type { MentionConfig } from './trigger/types'
 import type { SubmitPayload } from './serializer/types'
 
 export interface TagRendererSpec {
@@ -24,6 +26,8 @@ export interface ChatInputProps {
   enterBehavior?: 'submit' | 'newline'
   placeholder?: string
   tagRenderers?: TagRendererSpec[]
+  /** Trigger configs (e.g. @-mentions): each maps a trigger char to a data source. */
+  mentions?: MentionConfig[]
   /** Exposes the underlying editor once mounted (used by demos and E2E tests). */
   onReady?: (editor: LexicalEditor) => void
 }
@@ -59,6 +63,7 @@ export function ChatInput({
   enterBehavior = 'submit',
   placeholder = '',
   tagRenderers = [],
+  mentions = [],
   onReady,
 }: ChatInputProps) {
   return (
@@ -88,7 +93,8 @@ export function ChatInput({
           />
           <HistoryPlugin />
           <ClearEditorPlugin />
-          <SubmitPlugin onSubmit={onSubmit} enterBehavior={enterBehavior} />
+          <SubmitPlugin enterBehavior={enterBehavior} onSubmit={onSubmit} />
+          {mentions.length > 0 && <MentionPlugin configs={mentions} />}
         </div>
       </LexicalComposer>
     </TagProvider>

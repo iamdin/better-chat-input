@@ -1,23 +1,37 @@
 "use client";
 
-import { $createTagNode, ChatInput } from "@coss/ui/components/chat-input";
-import { $getRoot, $insertNodes, type LexicalEditor } from "lexical";
-import { useRef, useState } from "react";
+import { ChatInput } from "@coss/ui/components/chat-input";
+import { useState } from "react";
+
+const USERS = [
+  { id: "u1", name: "Alice" },
+  { id: "u2", name: "Bob" },
+  { id: "u3", name: "Carol" },
+  { id: "u4", name: "Dave" },
+  { id: "u5", name: "Erin" },
+  { id: "u6", name: "张三" },
+];
 
 export default function ChatInputShowcase() {
-  const [last, setLast] = useState("submit to see payload");
-  const editorRef = useRef<LexicalEditor | null>(null);
+  const [last, setLast] = useState("Type @ to mention someone, then submit.");
   return (
     <div
       style={{ display: "grid", gap: 16, margin: "4rem auto", maxWidth: 680 }}
     >
       <h1>ChatInput</h1>
       <ChatInput
-        onReady={(e) => {
-          editorRef.current = e;
-        }}
+        mentions={[
+          {
+            search: (q) =>
+              USERS.filter((u) =>
+                u.name.toLowerCase().includes(q.toLowerCase()),
+              ),
+            tagType: "user",
+            trigger: "@",
+          },
+        ]}
         onSubmit={(p) => setLast(JSON.stringify(p, null, 2))}
-        placeholder="Type a message. Enter submits, Shift+Enter newlines."
+        placeholder="Type a message. @ to mention, Enter to submit, Shift+Enter for newline."
         tagRenderers={[
           {
             render: (d) => (
@@ -36,20 +50,6 @@ export default function ChatInputShowcase() {
           },
         ]}
       />
-      <button
-        data-testid="insert-tag"
-        onClick={() =>
-          editorRef.current?.update(() => {
-            // Clicking the button blurs the editor, clearing the selection, so
-            // anchor the insertion at the end of the content explicitly.
-            $getRoot().selectEnd();
-            $insertNodes([$createTagNode("user", { id: "u1", name: "Alice" })]);
-          })
-        }
-        type="button"
-      >
-        Insert @Alice
-      </button>
       <pre
         data-testid="payload"
         style={{ background: "#f6f6f6", padding: 12, whiteSpace: "pre-wrap" }}
