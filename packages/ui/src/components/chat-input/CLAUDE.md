@@ -13,7 +13,7 @@ file is the working guide for anyone (human or agent) editing this directory.
   menu, drives keyboard nav, positions the menu, and applies the chosen result.
 - A trigger = a **self-registering plugin component**, never a config array
   (spec §3 forbids the config-array god-component). A plugin composes:
-  - `useTriggerSlot({char, id, kind?})` → `{ active, query, select, close }`
+  - `useTrigger({char, id, kind?})` → `{ active, query, select, close }`
   - `useQuery(...)` with `enabled: active` (data lives in the plugin)
   - `useTagRenderer(tagType, render)` (render decoupled from trigger presence)
   - `useTriggerSource({...})` to report candidates. A source is **flat**
@@ -35,7 +35,7 @@ NodeKey anchoring, spec §4.8). Cascade levels (`CascadeLevel` in `context.ts`):
 + optional `match` (in-level filter) + `label` (breadcrumb).
 
 Authoritative design spec (846 lines): `~/ObsidianVault/Neo/ChatInput/ChatInput-Technical-Design.md`.
-Naming is strict: `TriggerComposer` / `useTriggerSlot` / `useTriggerSource` /
+Naming is strict: `TriggerComposer` / `useTrigger` / `useTriggerSource` /
 `useTagRenderer` / `TagNode` — do not introduce alternate terms.
 
 ## Unit tests

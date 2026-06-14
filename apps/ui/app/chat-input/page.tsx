@@ -5,7 +5,7 @@ import {
   type CharMatchConfig,
   ChatInput,
   useTagRenderer,
-  useTriggerSlot,
+  useTrigger,
   useTriggerSource,
 } from "@coss/ui/components/chat-input";
 import {
@@ -130,7 +130,7 @@ const queryClient = new QueryClient();
 // them into one menu (spec §4.3). Users and Files are flat groups; Teams is a
 // cascade source whose items drill into members, all in the same menu (§4.11).
 function UserMentionPlugin() {
-  const { active, query } = useTriggerSlot({ char: "@", id: "user" });
+  const { active, query } = useTrigger({ char: "@", id: "user" });
   const { data, isLoading } = useQuery({
     enabled: active,
     queryFn: () => searchUsers(query),
@@ -161,7 +161,7 @@ function UserMentionPlugin() {
 }
 
 function FileMentionPlugin() {
-  const { active, query } = useTriggerSlot({ char: "@", id: "file" });
+  const { active, query } = useTrigger({ char: "@", id: "file" });
   const { data, isLoading } = useQuery({
     enabled: active,
     queryFn: () => searchFiles(query),
@@ -205,7 +205,7 @@ function FileMentionPlugin() {
 // the flat groups above, but its items drill into team members. The engine
 // renders the breadcrumb, drives → / ← / type-to-filter — no custom panel.
 function TeamMentionPlugin() {
-  const { active, query } = useTriggerSlot({ char: "@", id: "team" });
+  const { active, query } = useTrigger({ char: "@", id: "team" });
   const { data, isLoading } = useQuery({
     enabled: active,
     queryFn: () => searchTeams(query),
@@ -251,7 +251,7 @@ function TeamMentionPlugin() {
 // is deliberately lighter than the colored mention pills: no background, just a
 // muted monospace `/name`. Commands are local and static, so it filters in place.
 function SlashCommandPlugin() {
-  const { active, query } = useTriggerSlot({ char: "/", id: "slash" });
+  const { active, query } = useTrigger({ char: "/", id: "slash" });
   useTagRenderer("command", (d) => (
     <span
       data-testid="tag-pill"

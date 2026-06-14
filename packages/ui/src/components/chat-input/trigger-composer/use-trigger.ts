@@ -22,7 +22,7 @@ export interface TriggerSlot {
  * keyboard to this plugin (spec §4.11). Menu plugins omit `kind` and report
  * candidates via useTriggerSource instead.
  */
-export function useTriggerSlot({
+export function useTrigger({
   char,
   id,
   kind,
