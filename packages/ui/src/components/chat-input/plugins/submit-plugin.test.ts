@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $getRoot, $createParagraphNode, $createTextNode, KEY_ENTER_COMMAND } from 'lexical'
-import { TagNode } from '../tag/TagNode'
+import { TagNode } from '../tag/tag-node'
 import type { SubmitPayload } from '../serializer/types'
-import { registerSubmit } from './SubmitPlugin'
+import { registerSubmit } from './submit-plugin'
 
 function editorWithText(text: string) {
   const editor = createHeadlessEditor({ namespace: 'test', nodes: [TagNode], onError: (e) => { throw e } })

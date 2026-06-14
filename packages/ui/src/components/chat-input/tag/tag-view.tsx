@@ -1,5 +1,5 @@
 import type { JSX } from 'react'
-import type { TagData } from './TagNode'
+import type { TagData } from './tag-node'
 import { useTagRendererRegistry } from './use-tag-renderer'
 
 export function TagView({ tag }: { tag: TagData }): JSX.Element {

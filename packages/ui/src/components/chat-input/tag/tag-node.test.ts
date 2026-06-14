@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $getRoot, $createParagraphNode } from 'lexical'
-import { TagNode, $createTagNode, $isTagNode } from './TagNode'
+import { TagNode, $createTagNode, $isTagNode } from './tag-node'
 
 function editorWith() {
   return createHeadlessEditor({ namespace: 'test', nodes: [TagNode], onError: (e) => { throw e } })

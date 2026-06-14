@@ -9,7 +9,7 @@ import {
   type Spread,
 } from 'lexical'
 import type { JSX } from 'react'
-import { TagView } from './TagView'
+import { TagView } from './tag-view'
 
 export interface TagData {
   tagType: string

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $createParagraphNode, $createTextNode, $getRoot, $isTextNode } from 'lexical'
-import { $createTagNode, $isTagNode, TagNode } from '../tag/TagNode'
+import { $createTagNode, $isTagNode, TagNode } from '../tag/tag-node'
 import {
   anchorPending,
   insertPending,

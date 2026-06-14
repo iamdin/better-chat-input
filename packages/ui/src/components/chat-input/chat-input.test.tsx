@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { render, screen } from '@testing-library/react'
-import { ChatInput } from './ChatInput'
+import { ChatInput } from './chat-input'
 
 describe('ChatInput', () => {
   test('renders a contenteditable and placeholder', () => {

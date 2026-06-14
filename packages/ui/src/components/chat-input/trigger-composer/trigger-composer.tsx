@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { $isTagNode } from '../tag/TagNode'
+import { $isTagNode } from '../tag/tag-node'
 import { type CharMatchConfig, matchTrigger } from '../trigger/match'
 import {
   anchorPending,

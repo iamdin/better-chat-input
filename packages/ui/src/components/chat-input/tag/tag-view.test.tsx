@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { render, screen } from '@testing-library/react'
-import { TagProvider } from './TagProvider'
+import { TagProvider } from './tag-provider'
 import { useTagRenderer } from './use-tag-renderer'
-import { TagView } from './TagView'
+import { TagView } from './tag-view'
 
 function RegisterUser() {
   useTagRenderer('user', (data) => <span data-testid="custom">USER:{String(data.name)}</span>)

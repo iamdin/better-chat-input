@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical'
-import { TagNode, $createTagNode } from '../tag/TagNode'
+import { TagNode, $createTagNode } from '../tag/tag-node'
 import { serializeEditorState } from './serialize'
 
 function editorWith() {

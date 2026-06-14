@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef } from 'react'
-import { TagRendererContext, type TagRenderer } from './TagProvider'
+import { TagRendererContext, type TagRenderer } from './tag-provider'
 
 function useRegistry() {
   const registry = useContext(TagRendererContext)

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { render, screen } from '@testing-library/react'
-import { TagProvider } from './TagProvider'
+import { TagProvider } from './tag-provider'
 import { useTagRenderer, useTagRendererRegistry } from './use-tag-renderer'
 
 function RegisterUser() {

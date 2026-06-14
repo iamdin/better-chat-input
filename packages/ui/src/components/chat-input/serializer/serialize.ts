@@ -1,5 +1,5 @@
 import { $getRoot, $isElementNode, type EditorState } from 'lexical'
-import { $isTagNode } from '../tag/TagNode'
+import { $isTagNode } from '../tag/tag-node'
 import type { SubmitPayload, TagEntity } from './types'
 
 const TAG_PLACEHOLDER = '￼' // OBJECT REPLACEMENT CHARACTER (U+FFFC)
