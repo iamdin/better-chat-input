@@ -8,6 +8,8 @@ import {
   COMMAND_PRIORITY_CRITICAL,
   COMMAND_PRIORITY_LOW,
   KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_ARROW_UP_COMMAND,
   KEY_BACKSPACE_COMMAND,
   KEY_ENTER_COMMAND,
@@ -224,6 +226,34 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
           // In a drilled panel, Backspace climbs up instead of deleting text.
           if (menuRef.current && menuRef.current.levels.length > 1) {
             return back()
+          }
+          return false
+        },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      // ArrowLeft mirrors Enter/ArrowRight: it climbs back out of a panel.
+      editor.registerCommand(
+        KEY_ARROW_LEFT_COMMAND,
+        (event) => {
+          if (menuRef.current && menuRef.current.levels.length > 1) {
+            event?.preventDefault()
+            return back()
+          }
+          return false
+        },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      // ArrowRight drills into a branch item (leaves fall through to the caret).
+      editor.registerCommand(
+        KEY_ARROW_RIGHT_COMMAND,
+        (event) => {
+          const m = menuRef.current
+          if (!m) return false
+          const item = currentItems()[activeRef.current]
+          if (item && hasChildren(m.config, item)) {
+            event?.preventDefault()
+            choose(item)
+            return true
           }
           return false
         },

@@ -47,8 +47,8 @@ export default function ChatInputShowcase() {
       <h1>ChatInput</h1>
       <p style={{ color: "#666", fontSize: 14 }}>
         Grouped results (<b>Teams</b> / <b>People</b>) with cascading selection:
-        choosing a team drills into its members. ↑↓ navigate · Enter select ·
-        Backspace go back · Esc close.
+        choosing a team drills into its members. ↑↓ navigate · Enter / → drill
+        or select · ← / Backspace go back · Esc close.
       </p>
       <ChatInput
         mentions={[
