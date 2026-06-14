@@ -2,7 +2,10 @@
 
 import {
   $createTagNode,
+  type CharMatchConfig,
   ChatInput,
+  type SelectResult,
+  type TriggerEditorAPI,
   useTagRenderer,
   useTriggerSlot,
   useTriggerSource,
@@ -34,6 +37,15 @@ interface Team {
   id: string;
   name: string;
   members: Member[];
+}
+
+// A slash command: typed as `/name`, it runs an effect rather than inserting a
+// mention tag. `run` returns a SelectResult — `insertText` swaps the `/cmd` run
+// for a snippet, `action` runs a side effect with no node left behind (§4.12).
+interface Command {
+  hint: string;
+  name: string;
+  run: () => SelectResult;
 }
 
 const USERS: User[] = [
@@ -107,6 +119,13 @@ function searchTeams(query: string): Promise<Team[]> {
 function fetchFilePath(f: FileItem): Promise<string> {
   return new Promise((resolve) => setTimeout(() => resolve(f.path), 900));
 }
+
+// Slash commands fire only at the very start of the input and stop at the first
+// whitespace — a custom per-char pattern (§4.6) instead of the @-style boundary
+// that fires anywhere. `^\/` anchors to the start; `[^/\s]*` is the command word.
+const CHAR_CONFIG: Record<string, CharMatchConfig> = {
+  "/": { pattern: /^\/([^/\s]*)$/u },
+};
 
 const queryClient = new QueryClient();
 
@@ -229,6 +248,64 @@ function TeamMentionPlugin() {
   return null;
 }
 
+// A slash-command plugin on its own '/' char (not '@'). Unlike the mention
+// plugins it inserts no tag: each command's `run` returns either an `insertText`
+// (swap `/cmd` for a snippet) or an `action` side effect (§4.12). Commands are
+// local and static, so it filters in place — no React Query needed.
+function SlashCommandPlugin({
+  onCommand,
+}: {
+  onCommand: (msg: string) => void;
+}) {
+  const { active, query } = useTriggerSlot({ char: "/", id: "slash" });
+  const commands: Command[] = [
+    {
+      hint: "¯\\_(ツ)_/¯",
+      name: "shrug",
+      run: () => ({ insertText: "¯\\_(ツ)_/¯" }),
+    },
+    {
+      hint: "(╯°□°)╯︵ ┻━┻",
+      name: "tableflip",
+      run: () => ({ insertText: "(╯°□°)╯︵ ┻━┻" }),
+    },
+    {
+      hint: "insert the current time",
+      name: "now",
+      run: () => ({ insertText: new Date().toLocaleTimeString() }),
+    },
+    {
+      // `action` runs after the engine has already stripped the `/help` run, so
+      // it is free to drive the editor via the API and fire page-level effects.
+      hint: "list commands (via the action API)",
+      name: "help",
+      run: () => ({
+        action: (api: TriggerEditorAPI) => {
+          api.insertText("Available: /shrug /tableflip /now /help");
+          onCommand("Ran /help");
+        },
+      }),
+    },
+  ];
+  const q = query.toLowerCase();
+  const matches = commands.filter((c) => c.name.toLowerCase().startsWith(q));
+  useTriggerSource<Command>({
+    char: "/",
+    group: "Commands",
+    id: "slash",
+    items: active ? matches : [],
+    onSelect: (c) => c.run(),
+    order: 3,
+    renderItem: (c) => (
+      <span>
+        <strong>/{c.name}</strong>{" "}
+        <span style={{ color: "#888" }}>{c.hint}</span>
+      </span>
+    ),
+  });
+  return null;
+}
+
 export default function ChatInputShowcase() {
   const [last, setLast] = useState(
     "Type @ — Users and Files are flat groups; Teams is a cascade, all in one menu.",
@@ -246,13 +323,22 @@ export default function ChatInputShowcase() {
           just type to filter — flat and cascade sources coexist. All React
           Query–driven.
         </p>
+        <p style={{ color: "#666", fontSize: 14 }}>
+          Type <code>/</code> at the start of the line for{" "}
+          <strong>slash commands</strong> — a separate trigger char that runs an
+          effect instead of inserting a tag (<code>/shrug</code>,{" "}
+          <code>/now</code> use <code>insertText</code>; <code>/help</code> uses
+          an <code>action</code>).
+        </p>
         <ChatInput
+          charConfig={CHAR_CONFIG}
           onSubmit={(p) => setLast(JSON.stringify(p, null, 2))}
-          placeholder="Message — @ for users, files, or a team member…"
+          placeholder="Message — @ for mentions, / for commands…"
         >
           <UserMentionPlugin />
           <FileMentionPlugin />
           <TeamMentionPlugin />
+          <SlashCommandPlugin onCommand={setLast} />
         </ChatInput>
         <pre
           data-testid="payload"

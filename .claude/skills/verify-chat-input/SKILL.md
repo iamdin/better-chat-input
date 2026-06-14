@@ -114,6 +114,19 @@ agent-browser eval "JSON.stringify({active:document.querySelector('[data-active=
 # full Enter → @Alice tag inserted, menu closes. (press Enter would silently no-op.)
 ```
 
+### Slash commands (separate `/` char, `action` result, start-anchored)
+```bash
+# '/' is its own trigger char with a start-anchored pattern (charConfig
+# { '/': { pattern: /^\/([^/\s]*)$/u } }) — fires ONLY at the line start.
+agent-browser keyboard type "/" ; agent-browser wait 400
+agent-browser eval "JSON.stringify({groups:[...document.querySelectorAll('[data-testid=mention-group]')].map(g=>g.textContent),items:[...document.querySelectorAll('[data-testid=mention-item]')].map(i=>i.textContent.trim())})"
+# expect group Commands; items /shrug /tableflip /now /help
+# insertText result: type 'sh', full Enter → editor text becomes the snippet, menu closes
+# action result (/help): type '/help', full Enter → editor gets api.insertText output
+#   AND the payload area updates (onCommand side effect) — exercises SelectResult.action (§4.12)
+# start-anchored: reload, type "hi /" → NO menu (mid-line '/' is suppressed by the ^ anchor)
+```
+
 ### Custom escape-hatch (`kind:'custom'`)
 If a demo registers a `kind:'custom'` source, the engine yields its menu +
 keyboard; the plugin draws its own panel (still `mention-menu`/`mention-item`
