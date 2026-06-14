@@ -1,46 +1,44 @@
 "use client";
 
-import { ChatInput, type MentionItem } from "@coss/ui/components/chat-input";
+import {
+  ChatInput,
+  type MentionGroup,
+  type MentionItem,
+} from "@coss/ui/components/chat-input";
 import { useState } from "react";
 
-const USERS = [
-  { id: "u1", name: "Alice" },
-  { id: "u2", name: "Bob" },
-  { id: "u3", name: "Carol" },
-  { id: "u4", name: "Dave" },
-  { id: "u5", name: "张三" },
+const TEAMS: MentionItem[] = [
+  {
+    id: "t1",
+    members: [
+      { id: "a1", name: "Alice" },
+      { id: "a2", name: "Amir" },
+      { id: "a3", name: "Anna" },
+    ],
+    name: "Team Alpha",
+  },
+  {
+    id: "t2",
+    members: [
+      { id: "b1", name: "Bob" },
+      { id: "b2", name: "Bella" },
+    ],
+    name: "Team Beta",
+  },
 ];
 
-const CHANNELS = [
-  { id: "c1", name: "general" },
-  { id: "c2", name: "random" },
-  { id: "c3", name: "dev" },
-  { id: "c4", name: "design" },
+const PEOPLE: MentionItem[] = [
+  { id: "p1", name: "Carol" },
+  { id: "p2", name: "Dave" },
+  { id: "p3", name: "张三" },
 ];
 
-const COMMANDS = [
-  { id: "cmd1", name: "help" },
-  { id: "cmd2", name: "invite" },
-  { id: "cmd3", name: "settings" },
-  { id: "cmd4", name: "archive" },
-];
-
-const filterBy = (list: MentionItem[], q: string) =>
+const match = (list: MentionItem[], q: string) =>
   list.filter((x) => x.name.toLowerCase().includes(q.toLowerCase()));
-
-const pill = (bg: string, prefix: string) => (d: Record<string, unknown>) => (
-  <span
-    data-testid="tag-pill"
-    style={{ background: bg, borderRadius: 4, padding: "0 4px" }}
-  >
-    {prefix}
-    {String(d.name)}
-  </span>
-);
 
 export default function ChatInputShowcase() {
   const [last, setLast] = useState(
-    "Try @ for users, # for channels, / for commands — then submit.",
+    "Type @ — pick a Team to drill into its members, or pick a Person directly.",
   );
   return (
     <div
@@ -48,29 +46,48 @@ export default function ChatInputShowcase() {
     >
       <h1>ChatInput</h1>
       <p style={{ color: "#666", fontSize: 14 }}>
-        Multiple trigger sources: <code>@</code> users, <code>#</code> channels,{" "}
-        <code>/</code> commands.
+        Grouped results (<b>Teams</b> / <b>People</b>) with cascading selection:
+        choosing a team drills into its members. ↑↓ navigate · Enter select ·
+        Backspace go back · Esc close.
       </p>
       <ChatInput
         mentions={[
-          { search: (q) => filterBy(USERS, q), tagType: "user", trigger: "@" },
           {
-            search: (q) => filterBy(CHANNELS, q),
-            tagType: "channel",
-            trigger: "#",
-          },
-          {
-            search: (q) => filterBy(COMMANDS, q),
-            tagType: "command",
-            trigger: "/",
+            drill: (item) =>
+              Array.isArray(item.members)
+                ? [
+                    {
+                      items: item.members as MentionItem[],
+                      label: `${item.name} · members`,
+                    },
+                  ]
+                : null,
+            search: (q): MentionGroup[] => [
+              { items: match(TEAMS, q), label: "Teams" },
+              { items: match(PEOPLE, q), label: "People" },
+            ],
+            tagType: "user",
+            trigger: "@",
           },
         ]}
         onSubmit={(p) => setLast(JSON.stringify(p, null, 2))}
-        placeholder="Message — @ mention, # channel, / command…"
+        placeholder="Message — type @ to mention a teammate…"
         tagRenderers={[
-          { render: pill("#e0ecff", "@"), tagType: "user" },
-          { render: pill("#dcfce7", "#"), tagType: "channel" },
-          { render: pill("#ede9fe", "/"), tagType: "command" },
+          {
+            render: (d) => (
+              <span
+                data-testid="tag-pill"
+                style={{
+                  background: "#e0ecff",
+                  borderRadius: 4,
+                  padding: "0 4px",
+                }}
+              >
+                @{String(d.name)}
+              </span>
+            ),
+            tagType: "user",
+          },
         ]}
       />
       <pre
