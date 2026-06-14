@@ -110,12 +110,6 @@ function searchTeams(query: string): Promise<Team[]> {
   });
 }
 
-// Stand-in for a slow second fetch (e.g. resolving the full path / metadata)
-// that only runs after the user picks a file — drives the §4.8 async path.
-function fetchFilePath(f: FileItem): Promise<string> {
-  return new Promise((resolve) => setTimeout(() => resolve(f.path), 900));
-}
-
 // Slash commands fire only at the very start of the input and stop at the first
 // whitespace — a custom per-char pattern (§4.6) instead of the @-style boundary
 // that fires anywhere. `^\/` anchors to the start; `[^/\s]*` is the command word.
@@ -174,16 +168,10 @@ function FileMentionPlugin() {
   });
   useTagRenderer("file", (d) => (
     <span
-      data-pending={d.pending ? "true" : undefined}
       data-testid="tag-pill"
-      style={{
-        background: d.pending ? "#fff3cd" : "#e0ffe8",
-        borderRadius: 4,
-        padding: "0 4px",
-      }}
+      style={{ background: "#e0ffe8", borderRadius: 4, padding: "0 4px" }}
     >
-      {d.pending ? "⏳" : "📄"}
-      {String(d.name)}
+      📄{String(d.name)}
     </span>
   ));
   useTriggerSource<FileItem>({
@@ -192,14 +180,12 @@ function FileMentionPlugin() {
     id: "file",
     items: data ?? [],
     loading: isLoading,
-    // Async selection (spec §4.8): show a loading placeholder immediately, then
-    // re-anchor by NodeKey once the path resolves — typing during the wait is safe.
+    // Selection is synchronous, like the other mentions. The *async* part of this
+    // demo is the data source: the candidate list is fetched via React Query (see
+    // searchFiles + `loading` above), which renders the menu's "Loading…" state.
     onSelect: (f) => ({
-      pending: () =>
-        $createTagNode("file", { id: f.id, name: f.name, pending: true }),
-      resolve: fetchFilePath(f).then((path) => ({
-        toNode: () => $createTagNode("file", { id: f.id, name: f.name, path }),
-      })),
+      toNode: () =>
+        $createTagNode("file", { id: f.id, name: f.name, path: f.path }),
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,

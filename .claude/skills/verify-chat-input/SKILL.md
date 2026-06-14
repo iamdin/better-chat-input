@@ -30,7 +30,7 @@ Start the daemon Chrome per the **use-agent-browser** skill, then follow this.
 | `mention-group` | a group heading (flat source's `group`) |
 | `mention-item` | a candidate row (`data-active="true"` = highlighted; trailing `›` = cascade branch) |
 | `mention-breadcrumb` | shown only when drilled into a cascade level |
-| `tag-pill` | a rendered TagNode in the editor (`data-pending="true"` = async placeholder) |
+| `tag-pill` | a rendered TagNode in the editor (mention or `command`) |
 | `payload` | submitted `SubmitPayload` JSON |
 
 ## Two rules that prevent false results
@@ -85,17 +85,16 @@ agent-browser eval "const k=(c,cd,kc)=>document.querySelector('[contenteditable=
 # select leaf (Enter) → @Anna tag-pill ; ArrowLeft → back to top groups
 ```
 
-### Async selection (optimistic placeholder + race)
+### Async data source (menu loading state)
 ```bash
-agent-browser keyboard type "@app" ; agent-browser wait 600
-# select via full Enter; immediately a pending placeholder, then it resolves
-agent-browser eval "/* full Enter */"
-agent-browser wait 150 ; agent-browser eval "JSON.stringify({pending:!!document.querySelector('[data-pending=true]')})"   # true (⏳)
-agent-browser wait 1000 ; agent-browser eval "JSON.stringify({pills:[...document.querySelectorAll('[data-testid=tag-pill]')].map(p=>p.textContent.trim())})"  # 📄app.tsx
-# RACE: after selecting, keep typing during the fetch — the tag must still
-# resolve in place and the typed text stay after it (NodeKey anchoring, §4.8):
-#   keyboard type "@app" → full Enter → keyboard type "hello world" → wait 1100
-#   expect editor "📄app.tsx hello world"
+# Every @ source fetches candidates via React Query, so the menu shows a
+# transient "Loading…" before items arrive. Catch it right after typing:
+agent-browser keyboard type "@a" ; agent-browser wait 30
+agent-browser eval "document.querySelector('[data-testid=mention-menu]').textContent"   # may include 'Loading…'
+agent-browser wait 400 ; agent-browser eval "[...document.querySelectorAll('[data-testid=mention-item]')].map(i=>i.textContent.trim())"   # items resolved
+# NB: "async" here = the data SOURCE is async (fetching the candidate list).
+# Post-select async (optimistic placeholder + NodeKey re-anchoring, §4.8) is an
+# engine feature covered by unit tests (apply-select-result.test.ts), not the demo.
 ```
 
 ### CJK boundary + word-char suppression (§4.6)
