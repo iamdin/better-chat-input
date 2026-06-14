@@ -6,7 +6,6 @@ import {
   ChatInput,
   useTagRenderer,
   useTrigger,
-  useTriggerSource,
 } from "@coss/ui/components/chat-input";
 import {
   QueryClient,
@@ -110,6 +109,36 @@ function searchTeams(query: string): Promise<Team[]> {
   });
 }
 
+// useTrigger's `useItems` is a hook, so the candidate fetch lives in a hook of
+// its own (named use* so it can call useQuery). It is gated on `active` and keyed
+// on `query` — this is the bridge that lets items depend on the live query.
+function useUserItems(query: string, active: boolean) {
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => searchUsers(query),
+    queryKey: ["users", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
+function useFileItems(query: string, active: boolean) {
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => searchFiles(query),
+    queryKey: ["files", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
+function useTeamItems(query: string, active: boolean) {
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => searchTeams(query),
+    queryKey: ["teams", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
 // Slash commands fire only at the very start of the input and stop at the first
 // whitespace — a custom per-char pattern (§4.6) instead of the @-style boundary
 // that fires anywhere. `^\/` anchors to the start; `[^/\s]*` is the command word.
@@ -130,12 +159,6 @@ const queryClient = new QueryClient();
 // them into one menu (spec §4.3). Users and Files are flat groups; Teams is a
 // cascade source whose items drill into members, all in the same menu (§4.11).
 function UserMentionPlugin() {
-  const { active, query } = useTrigger({ char: "@", id: "user" });
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchUsers(query),
-    queryKey: ["users", query],
-  });
   useTagRenderer("user", (d) => (
     <span
       data-testid="tag-pill"
@@ -144,29 +167,22 @@ function UserMentionPlugin() {
       @{String(d.name)}
     </span>
   ));
-  useTriggerSource<User>({
+  useTrigger<User>({
     char: "@",
     group: "Users",
     id: "user",
-    items: data ?? [],
-    loading: isLoading,
     onSelect: (u) => ({
       toNode: () =>
         $createTagNode("user", { id: u.id, name: u.name, text: `@${u.name}` }),
     }),
     order: 0,
     renderItem: (u) => <span>@{u.name}</span>,
+    useItems: useUserItems,
   });
   return null;
 }
 
 function FileMentionPlugin() {
-  const { active, query } = useTrigger({ char: "@", id: "file" });
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchFiles(query),
-    queryKey: ["files", query],
-  });
   useTagRenderer("file", (d) => (
     <span
       data-testid="tag-pill"
@@ -175,15 +191,13 @@ function FileMentionPlugin() {
       📄{String(d.name)}
     </span>
   ));
-  useTriggerSource<FileItem>({
+  useTrigger<FileItem>({
     char: "@",
     group: "Files",
     id: "file",
-    items: data ?? [],
-    loading: isLoading,
     // Selection is synchronous, like the other mentions. The *async* part of this
-    // demo is the data source: the candidate list is fetched via React Query (see
-    // searchFiles + `loading` above), which renders the menu's "Loading…" state.
+    // demo is the data source (useItems): candidates are fetched via React Query,
+    // which renders the menu's "Loading…" state.
     onSelect: (f) => ({
       toNode: () =>
         // Plain-text copy is the path (useful pasted into code/terminal), not the
@@ -197,6 +211,7 @@ function FileMentionPlugin() {
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,
+    useItems: useFileItems,
   });
   return null;
 }
@@ -205,12 +220,6 @@ function FileMentionPlugin() {
 // the flat groups above, but its items drill into team members. The engine
 // renders the breadcrumb, drives → / ← / type-to-filter — no custom panel.
 function TeamMentionPlugin() {
-  const { active, query } = useTrigger({ char: "@", id: "team" });
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchTeams(query),
-    queryKey: ["teams", query],
-  });
   useTagRenderer("team-member", (d) => (
     <span
       data-testid="tag-pill"
@@ -219,7 +228,7 @@ function TeamMentionPlugin() {
       @{String(d.name)}
     </span>
   ));
-  useTriggerSource<Team>({
+  useTrigger<Team>({
     char: "@",
     getChildren: (t) => ({
       items: t.members,
@@ -238,10 +247,9 @@ function TeamMentionPlugin() {
     }),
     group: "Teams",
     id: "team",
-    items: data ?? [],
-    loading: isLoading,
     order: 2,
     renderItem: (t) => <span>👥 {t.name}</span>,
+    useItems: useTeamItems,
   });
   return null;
 }
@@ -251,7 +259,6 @@ function TeamMentionPlugin() {
 // is deliberately lighter than the colored mention pills: no background, just a
 // muted monospace `/name`. Commands are local and static, so it filters in place.
 function SlashCommandPlugin() {
-  const { active, query } = useTrigger({ char: "/", id: "slash" });
   useTagRenderer("command", (d) => (
     <span
       data-testid="tag-pill"
@@ -260,13 +267,10 @@ function SlashCommandPlugin() {
       /{String(d.name)}
     </span>
   ));
-  const q = query.toLowerCase();
-  const matches = COMMANDS.filter((c) => c.name.toLowerCase().startsWith(q));
-  useTriggerSource<Command>({
+  useTrigger<Command>({
     char: "/",
     group: "Commands",
     id: "slash",
-    items: active ? matches : [],
     onSelect: (c) => ({
       toNode: () =>
         $createTagNode("command", { name: c.name, text: `/${c.name}` }),
@@ -278,6 +282,15 @@ function SlashCommandPlugin() {
         <span style={{ color: "#888" }}>{c.hint}</span>
       </span>
     ),
+    // Local + static: no fetch, just filter the fixed list by the query.
+    useItems: (query, active) => {
+      const q = query.toLowerCase();
+      return {
+        items: active
+          ? COMMANDS.filter((c) => c.name.toLowerCase().startsWith(q))
+          : [],
+      };
+    },
   });
   return null;
 }

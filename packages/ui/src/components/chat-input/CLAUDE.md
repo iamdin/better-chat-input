@@ -12,19 +12,23 @@ file is the working guide for anyone (human or agent) editing this directory.
   holds the source registry, merges all sources sharing the active char into one
   menu, drives keyboard nav, positions the menu, and applies the chosen result.
 - A trigger = a **self-registering plugin component**, never a config array
-  (spec §3 forbids the config-array god-component). A plugin composes:
-  - `useTrigger({char, id, kind?})` → `{ active, query, select, close }`
-  - `useQuery(...)` with `enabled: active` (data lives in the plugin)
-  - `useTagRenderer(tagType, render)` (render decoupled from trigger presence)
-  - `useTriggerSource({...})` to report candidates. A source is **flat**
-    (`onSelect` on each item) or **cascade** (`getChildren(item)` returns a
-    `CascadeLevel`). Flat and cascade sources coexist in the same merged menu:
-    the engine renders branches with a `›`, drills on → / Enter, steps back on
-    ← / Backspace, and filters a drilled level via its `match` (spec §4.11).
-  - For arbitrary, non-menu UI use the escape hatch instead: `kind: 'custom'` +
-    draw your own panel with `useTypeaheadKeyboard`. (Mixing `menu` and `custom`
-    on the same char is forbidden, §4.5 — declarative cascade is the in-menu way
-    to get multiple levels.)
+  (spec §3 forbids the config-array god-component). A plugin composes two hooks:
+  - `useTrigger({ char, id, group?, order?, renderItem, onSelect | getChildren,
+    useItems })` → `{ active, query, select, close }`. This one hook subscribes
+    to the engine AND registers the source. `useItems(query, active)` is where
+    the candidates come from: it is itself a hook, so you call
+    `useQuery({ enabled: active })` keyed on `query` inside it — that resolves the
+    cycle where items depend on the query the hook returns. A source is **flat**
+    (`onSelect` per item) or **cascade** (`getChildren(item)` → `CascadeLevel`);
+    both coexist in the merged menu (branches show a `›`, drill on → / Enter, step
+    back on ← / Backspace, filter a drilled level via its `match`, spec §4.11).
+  - `useTagRenderer(tagType, render)` — kept separate on purpose: rendering is
+    decoupled from trigger presence (a tag renders from a saved draft / paste /
+    read-only view with no trigger mounted).
+  - For arbitrary, non-menu UI use the escape hatch: `useTrigger({ kind: 'custom' })`
+    (omit `useItems`) + draw your own panel with `useTypeaheadKeyboard`. (Mixing
+    `menu` and `custom` on the same char is forbidden, §4.5 — declarative cascade
+    is the in-menu way to get multiple levels.)
 - `tag/` — `TagNode` (DecoratorNode), `TagProvider`/`useTagRenderer`.
 - `serializer/` — editor state → `SubmitPayload`.
 
@@ -35,8 +39,8 @@ NodeKey anchoring, spec §4.8). Cascade levels (`CascadeLevel` in `context.ts`):
 + optional `match` (in-level filter) + `label` (breadcrumb).
 
 Authoritative design spec (846 lines): `~/ObsidianVault/Neo/ChatInput/ChatInput-Technical-Design.md`.
-Naming is strict: `TriggerComposer` / `useTrigger` / `useTriggerSource` /
-`useTagRenderer` / `TagNode` — do not introduce alternate terms.
+Naming is strict: `TriggerComposer` / `useTrigger` / `useTagRenderer` /
+`TagNode` — do not introduce alternate terms.
 
 ## Unit tests
 

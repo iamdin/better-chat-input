@@ -10,9 +10,11 @@ export type { SubmitPayload, TagEntity, ImagePayload, FilePayload } from './seri
 export { SUBMIT_COMMAND } from './commands'
 export { TriggerComposer } from './trigger-composer/trigger-composer'
 export { useTrigger } from './trigger-composer/use-trigger'
-export type { TriggerSlot } from './trigger-composer/use-trigger'
-export { useTriggerSource } from './trigger-composer/use-trigger-source'
-export type { TriggerSourceConfig } from './trigger-composer/use-trigger-source'
+export type {
+  TriggerSlot,
+  TriggerItems,
+  UseTriggerConfig,
+} from './trigger-composer/use-trigger'
 export type { CascadeLevel } from './trigger-composer/context'
 export { useTypeaheadKeyboard } from './trigger-composer/use-typeahead-keyboard'
 export type { TypeaheadKeyboardHandlers } from './trigger-composer/use-typeahead-keyboard'

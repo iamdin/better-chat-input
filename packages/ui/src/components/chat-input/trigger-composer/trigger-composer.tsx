@@ -64,8 +64,8 @@ interface ViewGroup {
  * The single arbitration hub for triggers (spec §4): it detects the trigger
  * char in the text, holds the source registry, merges all sources sharing the
  * active char into one menu, drives keyboard navigation, and applies the chosen
- * source's SelectResult. Trigger plugins self-register via useTriggerSource /
- * useTrigger — there is no central config array.
+ * source's SelectResult. Trigger plugins self-register via the single useTrigger
+ * hook — there is no central config array.
  *
  * Sources may be flat (grouped) or cascade (`getChildren`): both render in the
  * same merged menu, and the engine drills/returns through cascade levels with a
