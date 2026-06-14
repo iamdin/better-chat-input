@@ -211,7 +211,7 @@ export function MentionPlugin({ configs }: { configs: MentionConfig[] }) {
           >
             {menu.config.renderItem
               ? menu.config.renderItem(item, i === active)
-              : `@${item.name}`}
+              : `${menu.config.trigger}${item.name}`}
           </li>
         ))
       )}
