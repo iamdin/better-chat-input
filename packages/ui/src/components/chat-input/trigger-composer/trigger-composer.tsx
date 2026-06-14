@@ -27,6 +27,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { $isTagNode } from '../tag/tag-node'
+import { TagRendererContext, useTagRendererStore } from '../tag/tag-renderer-context'
 import { type CharMatchConfig, matchTrigger } from '../trigger/match'
 import {
   anchorPending,
@@ -80,6 +81,11 @@ export function TriggerComposer({
   charConfig?: Record<string, CharMatchConfig>
 }) {
   const [editor] = useLexicalComposerContext()
+
+  // Tag renderers live here too, so one component assembles triggers, sources,
+  // and tag appearance. The context is defined in the tag layer; we only provide
+  // its value (see tag-renderer-context.ts) — TagNode reads it to draw its pill.
+  const tagRegistry = useTagRendererStore()
 
   // Latest charConfig without re-subscribing the detection listener.
   const charConfigRef = useRef(charConfig)
@@ -489,79 +495,81 @@ export function TriggerComposer({
   const breadcrumb = path.map((p) => p.label).filter(Boolean).join(' › ')
 
   return (
-    <TriggerComposerContext.Provider value={engine}>
-      {children}
-      {showMenu &&
-        createPortal(
-          <ul
-            className="min-w-52 overflow-hidden rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
-            data-testid="mention-menu"
-            style={{
-              position: 'fixed',
-              top: rect.top + 4,
-              left: rect.left,
-              zIndex: 50,
-            }}
-          >
-            {path.length > 0 && (
-              <li
-                className="px-2 py-1 text-xs text-muted-foreground"
-                data-testid="mention-breadcrumb"
-              >
-                ‹ {breadcrumb}
-                {cascadeQuery && ` ${cascadeQuery}`}
-              </li>
-            )}
-            {!hasItems ? (
-              <li className="px-2 py-1.5 text-muted-foreground">
-                {anyLoading ? 'Loading…' : 'No results'}
-              </li>
-            ) : (
-              groups.map((group) => (
-                <Fragment key={group.id}>
-                  {group.label && (
-                    <li
-                      className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground"
-                      data-testid="mention-group"
-                    >
-                      {group.label}
-                    </li>
-                  )}
-                  {group.loading && group.items.length === 0 ? (
-                    <li className="px-2 py-1.5 text-muted-foreground">Loading…</li>
-                  ) : (
-                    group.items.map((vi) => {
-                      const isActive = vi.index === highlighted
-                      return (
-                        <li
-                          className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 ${
-                            isActive ? 'bg-accent text-accent-foreground' : ''
-                          }`}
-                          data-active={isActive}
-                          data-testid="mention-item"
-                          // biome-ignore lint/suspicious/noArrayIndexKey: stable within a render
-                          key={vi.index}
-                          // onMouseDown + preventDefault keeps editor focus.
-                          onMouseDown={(event) => {
-                            event.preventDefault()
-                            choose(vi.index)
-                          }}
-                          onMouseEnter={() => setHighlighted(vi.index)}
-                        >
-                          {vi.renderItem(vi.item)}
-                          {vi.branch && (
-                            <span className="text-muted-foreground">›</span>
-                          )}
-                        </li>
-                      )
-                    })
-                  )}
-                </Fragment>
-              ))
-            )}
-          </ul>,
-          document.body,
-        )}
-    </TriggerComposerContext.Provider>
+    <TagRendererContext.Provider value={tagRegistry}>
+      <TriggerComposerContext.Provider value={engine}>
+        {children}
+        {showMenu &&
+          createPortal(
+            <ul
+              className="min-w-52 overflow-hidden rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+              data-testid="mention-menu"
+              style={{
+                position: 'fixed',
+                top: rect.top + 4,
+                left: rect.left,
+                zIndex: 50,
+              }}
+            >
+              {path.length > 0 && (
+                <li
+                  className="px-2 py-1 text-xs text-muted-foreground"
+                  data-testid="mention-breadcrumb"
+                >
+                  ‹ {breadcrumb}
+                  {cascadeQuery && ` ${cascadeQuery}`}
+                </li>
+              )}
+              {!hasItems ? (
+                <li className="px-2 py-1.5 text-muted-foreground">
+                  {anyLoading ? 'Loading…' : 'No results'}
+                </li>
+              ) : (
+                groups.map((group) => (
+                  <Fragment key={group.id}>
+                    {group.label && (
+                      <li
+                        className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground"
+                        data-testid="mention-group"
+                      >
+                        {group.label}
+                      </li>
+                    )}
+                    {group.loading && group.items.length === 0 ? (
+                      <li className="px-2 py-1.5 text-muted-foreground">Loading…</li>
+                    ) : (
+                      group.items.map((vi) => {
+                        const isActive = vi.index === highlighted
+                        return (
+                          <li
+                            className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 ${
+                              isActive ? 'bg-accent text-accent-foreground' : ''
+                            }`}
+                            data-active={isActive}
+                            data-testid="mention-item"
+                            // biome-ignore lint/suspicious/noArrayIndexKey: stable within a render
+                            key={vi.index}
+                            // onMouseDown + preventDefault keeps editor focus.
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              choose(vi.index)
+                            }}
+                            onMouseEnter={() => setHighlighted(vi.index)}
+                          >
+                            {vi.renderItem(vi.item)}
+                            {vi.branch && (
+                              <span className="text-muted-foreground">›</span>
+                            )}
+                          </li>
+                        )
+                      })
+                    )}
+                  </Fragment>
+                ))
+              )}
+            </ul>,
+            document.body,
+          )}
+      </TriggerComposerContext.Provider>
+    </TagRendererContext.Provider>
   )
 }

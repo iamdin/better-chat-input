@@ -8,9 +8,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { LexicalEditor } from 'lexical'
 import { TagNode } from './tag/tag-node'
-import { TagProvider } from './tag/tag-provider'
 import { useTagRenderer } from './tag/use-tag-renderer'
-import type { TagRenderer } from './tag/tag-provider'
+import type { TagRenderer } from './tag/tag-renderer-context'
 import { SubmitPlugin } from './plugins/submit-plugin'
 import { TriggerComposer } from './trigger-composer/trigger-composer'
 import type { CharMatchConfig } from './trigger/match'
@@ -73,16 +72,19 @@ export function ChatInput({
   onReady,
 }: ChatInputProps) {
   return (
-    <TagProvider>
-      <LexicalComposer
-        initialConfig={{
-          namespace: 'chat-input',
-          nodes: [TagNode],
-          onError: (error) => {
-            throw error
-          },
-        }}
-      >
+    <LexicalComposer
+      initialConfig={{
+        namespace: 'chat-input',
+        nodes: [TagNode],
+        onError: (error) => {
+          throw error
+        },
+      }}
+    >
+      {/* One hub: TriggerComposer provides both the trigger engine and the tag
+          renderer registry, so it wraps the whole editor (TagNode renders inside
+          RichTextPlugin and must read the registry from here). */}
+      <TriggerComposer charConfig={charConfig}>
         <TagRenderers specs={tagRenderers} />
         <OnReady onReady={onReady} />
         <div className="relative rounded-md border border-input bg-transparent text-sm focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
@@ -100,9 +102,9 @@ export function ChatInput({
           <HistoryPlugin />
           <ClearEditorPlugin />
           <SubmitPlugin enterBehavior={enterBehavior} onSubmit={onSubmit} />
-          <TriggerComposer charConfig={charConfig}>{children}</TriggerComposer>
+          {children}
         </div>
-      </LexicalComposer>
-    </TagProvider>
+      </TriggerComposer>
+    </LexicalComposer>
   )
 }

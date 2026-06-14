@@ -1,10 +1,10 @@
 import { useContext, useEffect, useRef } from 'react'
-import { TagRendererContext, type TagRenderer } from './tag-provider'
+import { TagRendererContext, type TagRenderer } from './tag-renderer-context'
 
 function useRegistry() {
   const registry = useContext(TagRendererContext)
   if (!registry) {
-    throw new Error('Tag renderer hooks must be used inside <TagProvider>')
+    throw new Error('Tag renderer hooks must be used inside <TriggerComposer>')
   }
   return registry
 }

@@ -5,12 +5,16 @@ file is the working guide for anyone (human or agent) editing this directory.
 
 ## Architecture (one screen)
 
-- `<ChatInput>` — sets up `LexicalComposer`, `TagProvider`, plugins, and wraps
-  children in `<TriggerComposer>`. Props: `onSubmit`, `enterBehavior`,
-  `placeholder`, `tagRenderers`, `charConfig`, `children`, `onReady`.
-- `trigger-composer/` — the single arbitration engine. Detects the trigger char,
-  holds the source registry, merges all sources sharing the active char into one
-  menu, drives keyboard nav, positions the menu, and applies the chosen result.
+- `<ChatInput>` — sets up `LexicalComposer` and wraps the whole editor in a
+  single `<TriggerComposer>`. Props: `onSubmit`, `enterBehavior`, `placeholder`,
+  `tagRenderers`, `charConfig`, `children`, `onReady`.
+- `trigger-composer/` — the single hub. It (a) detects the trigger char, holds
+  the source registry, merges all sources sharing the active char into one menu,
+  drives keyboard nav, positions the menu, applies the chosen result, AND (b)
+  provides the **tag renderer registry** (the value for `TagRendererContext`,
+  whose definition stays in `tag/`). Because `TagNode` renders inside the editor
+  and reads that registry, TriggerComposer wraps the entire editor content. One
+  component therefore assembles triggers, sources, and tag renderers.
 - A trigger = a **self-registering plugin component**, never a config array
   (spec §3 forbids the config-array god-component). A plugin declares everything
   in one `useTrigger` call:
@@ -25,14 +29,19 @@ file is the working guide for anyone (human or agent) editing this directory.
     **cascade** (`getChildren(item)` → `CascadeLevel`); both coexist in the
     merged menu (branches show a `›`, drill on → / Enter, step back on ←
     / Backspace, filter a drilled level via its `match`, spec §4.11).
-  - `useTagRenderer(tagType, render)` is the underlying primitive (what
-    `renderTag` calls). Use it directly only when a tag must render with **no
-    trigger mounted** — a saved draft, a paste, a read-only view.
+  - `tagType` + `renderTag` register the inserted tag's appearance. There is no
+    separate public `useTagRenderer` — the renderer registry is internal plumbing
+    of TriggerComposer. To render a tag with no trigger source (a static/draft/
+    read-only view), pass `tagRenderers={[{ tagType, render }]}` to `<ChatInput>`;
+    the TriggerComposer engine stays inert when no source registers.
   - For arbitrary, non-menu UI use the escape hatch: `useTrigger({ kind: 'custom' })`
     (omit `useItems`) + draw your own panel with `useTypeaheadKeyboard`. (Mixing
     `menu` and `custom` on the same char is forbidden, §4.5 — declarative cascade
     is the in-menu way to get multiple levels.)
-- `tag/` — `TagNode` (DecoratorNode), `TagProvider`/`useTagRenderer`.
+- `tag/` — `TagNode` (DecoratorNode), `TagView`, and the renderer registry
+  context (`tag-renderer-context.ts`: `TagRendererContext` + `useTagRendererStore`,
+  whose value TriggerComposer provides). `use-tag-renderer.ts` holds the internal
+  `useTagRenderer`/`useTagRendererRegistry` hooks (no longer public).
 - `serializer/` — editor state → `SubmitPayload`.
 
 Selection results (`apply-select-result.ts`): `{toNode}` / `{insertText}` /
@@ -42,8 +51,8 @@ NodeKey anchoring, spec §4.8). Cascade levels (`CascadeLevel` in `context.ts`):
 + optional `match` (in-level filter) + `label` (breadcrumb).
 
 Authoritative design spec (846 lines): `~/ObsidianVault/Neo/ChatInput/ChatInput-Technical-Design.md`.
-Naming is strict: `TriggerComposer` / `useTrigger` / `useTagRenderer` /
-`TagNode` — do not introduce alternate terms.
+Naming is strict: `TriggerComposer` / `useTrigger` / `TagNode` — do not
+introduce alternate terms.
 
 ## Unit tests
 

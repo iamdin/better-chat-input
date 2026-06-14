@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import { render, screen } from '@testing-library/react'
-import { TagProvider } from './tag-provider'
+import type { ReactNode } from 'react'
+import { TagRendererContext, useTagRendererStore } from './tag-renderer-context'
 import { useTagRenderer } from './use-tag-renderer'
 import { TagView } from './tag-view'
+
+// Supplies just the registry context (normally provided by <TriggerComposer>).
+function TagProvider({ children }: { children: ReactNode }) {
+  const registry = useTagRendererStore()
+  return <TagRendererContext.Provider value={registry}>{children}</TagRendererContext.Provider>
+}
 
 function RegisterUser() {
   useTagRenderer('user', (data) => <span data-testid="custom">USER:{String(data.name)}</span>)

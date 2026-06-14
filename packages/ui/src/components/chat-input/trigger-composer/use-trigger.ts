@@ -41,11 +41,10 @@ export interface UseTriggerConfig<T> {
   useItems?: (query: string, active: boolean) => TriggerItems<T>
   renderItem?: (item: T) => ReactNode
   /**
-   * Convenience: register this plugin's tag appearance here too, so a trigger and
-   * its tag are declared in one place. `tagType` is the tag this plugin produces;
-   * `renderTag(data)` draws the inserted pill (distinct from `renderItem`, which
-   * draws the menu row). For tags that must render with no trigger mounted
-   * (drafts, paste, read-only views), call `useTagRenderer` directly instead.
+   * Register this plugin's tag appearance here too, so the trigger, its source,
+   * and its rendered tag are all declared in one place (assembled by the single
+   * TriggerComposer). `tagType` is the tag this plugin produces; `renderTag(data)`
+   * draws the inserted pill (distinct from `renderItem`, which draws the menu row).
    */
   tagType?: string
   renderTag?: (data: Record<string, unknown>) => ReactNode
