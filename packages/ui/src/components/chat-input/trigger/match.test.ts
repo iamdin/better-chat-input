@@ -35,12 +35,25 @@ describe('matchTrigger', () => {
     expect(m?.query).toBe('张三')
   })
 
-  test('does NOT match when an email-like @ is mid-word (no boundary)', () => {
-    expect(matchTrigger('mail me at foo@bar', configs)).toBeNull()
+  test('keeps spaces so multi-word names work', () => {
+    const m = matchTrigger('@Team Alpha', configs)
+    expect(m?.query).toBe('Team Alpha')
+    expect(m?.matched).toBe('@Team Alpha')
   })
 
-  test('does NOT match once a space follows the query', () => {
-    expect(matchTrigger('@bob ', configs)).toBeNull()
+  test('keeps a drill path with slashes', () => {
+    const m = matchTrigger('@Team Alpha/al', configs)
+    expect(m?.query).toBe('Team Alpha/al')
+  })
+
+  test('anchors to the most recent trigger', () => {
+    const m = matchTrigger('@alice @bo', configs)
+    expect(m?.query).toBe('bo')
+    expect(m?.matched).toBe('@bo')
+  })
+
+  test('does NOT match when an email-like @ is mid-word (no boundary)', () => {
+    expect(matchTrigger('mail me at foo@bar', configs)).toBeNull()
   })
 
   test('does NOT match plain text with no trigger', () => {

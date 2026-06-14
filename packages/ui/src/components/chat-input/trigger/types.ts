@@ -20,11 +20,16 @@ export interface MentionConfig {
   trigger: string
   /** tagType used when a leaf item is inserted as a TagNode. */
   tagType: string
-  /** First-level results for the current query, as one or more groups. */
+  /**
+   * First-level results, as one or more groups. You filter by `query` yourself
+   * (it is the level-0 search term). Called with '' to enumerate all branches
+   * when resolving a drill path.
+   */
   search: (query: string) => MentionGroup[]
   /**
-   * Called when an item is chosen. Return child groups to drill into a deeper
-   * level (cascading selection), or null/undefined for a leaf that is inserted.
+   * Return a branch item's child groups (the full set — the engine filters them
+   * by what the user types next), or null/undefined for a leaf that is inserted.
+   * Choosing a branch drills in; choosing a leaf inserts it as a TagNode.
    */
   drill?: (item: MentionItem) => MentionGroup[] | null | undefined
   /** Optional custom row renderer; defaults to `{trigger}{name}`. */
