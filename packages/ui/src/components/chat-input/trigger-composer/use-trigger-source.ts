@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import type { PendingSelect, SelectResult } from './apply-select-result'
-import { useTriggerComposerContext } from './context'
+import { type CascadeLevel, useTriggerComposerContext } from './context'
 
 export interface TriggerSourceConfig<T> {
   id: string
@@ -16,7 +16,13 @@ export interface TriggerSourceConfig<T> {
   loading?: boolean
   error?: unknown
   renderItem: (item: T) => ReactNode
-  onSelect: (item: T) => SelectResult | PendingSelect
+  /** Leaf action for a flat source. Omit when the source is a cascade. */
+  onSelect?: (item: T) => SelectResult | PendingSelect
+  /**
+   * Make this a cascade source: items become branches the engine drills into,
+   * shown in the same merged menu next to flat grouped sources (spec §4.11).
+   */
+  getChildren?: (item: T) => CascadeLevel | null | undefined
 }
 
 /**
@@ -39,9 +45,12 @@ export function useTriggerSource<T>(config: TriggerSourceConfig<T>): void {
       loading: config.loading,
       error: config.error,
       renderItem: config.renderItem as (item: unknown) => ReactNode,
-      onSelect: config.onSelect as (
-        item: unknown,
-      ) => SelectResult | PendingSelect,
+      onSelect: config.onSelect as
+        | ((item: unknown) => SelectResult | PendingSelect)
+        | undefined,
+      getChildren: config.getChildren as
+        | ((item: unknown) => CascadeLevel | null | undefined)
+        | undefined,
     })
   })
 }

@@ -16,15 +16,23 @@ file is the working guide for anyone (human or agent) editing this directory.
   - `useTriggerSlot({char, id, kind?})` → `{ active, query, select, close }`
   - `useQuery(...)` with `enabled: active` (data lives in the plugin)
   - `useTagRenderer(tagType, render)` (render decoupled from trigger presence)
-  - `useTriggerSource({...})` to report candidates (menu plugins), **or**
-    `kind: 'custom'` + draw your own UI with `useTypeaheadKeyboard` (escape
-    hatch for multi-level panels, spec §4.11)
+  - `useTriggerSource({...})` to report candidates. A source is **flat**
+    (`onSelect` on each item) or **cascade** (`getChildren(item)` returns a
+    `CascadeLevel`). Flat and cascade sources coexist in the same merged menu:
+    the engine renders branches with a `›`, drills on → / Enter, steps back on
+    ← / Backspace, and filters a drilled level via its `match` (spec §4.11).
+  - For arbitrary, non-menu UI use the escape hatch instead: `kind: 'custom'` +
+    draw your own panel with `useTypeaheadKeyboard`. (Mixing `menu` and `custom`
+    on the same char is forbidden, §4.5 — declarative cascade is the in-menu way
+    to get multiple levels.)
 - `tag/` — `TagNode` (DecoratorNode), `TagProvider`/`useTagRenderer`.
 - `serializer/` — editor state → `SubmitPayload`.
 
 Selection results (`apply-select-result.ts`): `{toNode}` / `{insertText}` /
 `{action}` for sync, or `{pending, resolve}` for async (optimistic placeholder +
-NodeKey anchoring, spec §4.8).
+NodeKey anchoring, spec §4.8). Cascade levels (`CascadeLevel` in `context.ts`):
+`items` + `renderItem` + `onSelect` (leaf) and/or `getChildren` (deeper branch)
++ optional `match` (in-level filter) + `label` (breadcrumb).
 
 Authoritative design spec (846 lines): `~/ObsidianVault/Neo/ChatInput/ChatInput-Technical-Design.md`.
 Naming is strict: `TriggerComposer` / `useTriggerSlot` / `useTriggerSource` /

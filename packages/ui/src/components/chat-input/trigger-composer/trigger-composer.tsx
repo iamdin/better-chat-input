@@ -7,7 +7,11 @@ import {
   COMMAND_PRIORITY_CRITICAL,
   COMMAND_PRIORITY_LOW,
   KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_ARROW_UP_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
@@ -32,20 +36,28 @@ import {
   type SelectResult,
 } from './apply-select-result'
 import {
-  TriggerComposerContext,
+  type CascadeLevel,
   type RegisteredSource,
   type SourcePatch,
+  TriggerComposerContext,
   type TriggerComposerEngine,
 } from './context'
 
-interface Candidate {
-  sourceId: string
+/** A flattened, navigable entry in the current menu view (top level or drilled). */
+interface ViewItem {
   item: unknown
+  index: number
+  branch: boolean
+  renderItem: (item: unknown) => ReactNode
+  onSelect?: (item: unknown) => SelectResult | PendingSelect
+  getChildren?: (item: unknown) => CascadeLevel | null | undefined
 }
 
-interface MenuGroup {
-  source: RegisteredSource
-  items: { item: unknown; index: number }[]
+interface ViewGroup {
+  id: string
+  label?: string
+  loading?: boolean
+  items: ViewItem[]
 }
 
 /**
@@ -54,6 +66,10 @@ interface MenuGroup {
  * active char into one menu, drives keyboard navigation, and applies the chosen
  * source's SelectResult. Trigger plugins self-register via useTriggerSource /
  * useTriggerSlot — there is no central config array.
+ *
+ * Sources may be flat (grouped) or cascade (`getChildren`): both render in the
+ * same merged menu, and the engine drills/returns through cascade levels with a
+ * breadcrumb (spec §4.11). Fully custom UIs still use the `kind: 'custom'` slot.
  */
 export function TriggerComposer({
   children,
@@ -80,6 +96,9 @@ export function TriggerComposer({
   const [matchStart, setMatchStart] = useState(-1)
   const [rect, setRect] = useState<{ top: number; left: number } | null>(null)
   const [highlighted, setHighlighted] = useState(0)
+  // Cascade drill stack + in-level filter query (empty at the top level).
+  const [path, setPath] = useState<{ label: string; level: CascadeLevel }[]>([])
+  const [cascadeQuery, setCascadeQuery] = useState('')
 
   const matchStartRef = useRef(matchStart)
   matchStartRef.current = matchStart
@@ -87,6 +106,10 @@ export function TriggerComposer({
   activeCharRef.current = activeChar
   const highlightedRef = useRef(highlighted)
   highlightedRef.current = highlighted
+  const pathRef = useRef(path)
+  pathRef.current = path
+  const cascadeQueryRef = useRef(cascadeQuery)
+  cascadeQueryRef.current = cascadeQuery
 
   const register = useCallback(
     (id: string, char: string, order?: number) => {
@@ -123,7 +146,15 @@ export function TriggerComposer({
     setMatchStart(-1)
     setRect(null)
     setHighlighted(0)
+    setPath([])
+    setCascadeQuery('')
   }, [])
+
+  // Reset the cascade stack whenever the active trigger changes (incl. close).
+  useEffect(() => {
+    setPath([])
+    setCascadeQuery('')
+  }, [activeChar])
 
   const select = useCallback(
     (_id: string, result: SelectResult | PendingSelect) => {
@@ -154,35 +185,81 @@ export function TriggerComposer({
   const hasCustomRef = useRef(hasCustom)
   hasCustomRef.current = hasCustom
 
-  // Merged menu groups (menu-kind sources only) with a global item index.
-  const groups: MenuGroup[] = useMemo(() => {
+  const currentLevel = path[path.length - 1]?.level ?? null
+
+  // The menu view: at the top level, flat grouped sources + cascade branch
+  // sources; once drilled, the current cascade level (filtered by cascadeQuery).
+  const groups: ViewGroup[] = useMemo(() => {
+    void menuVersion
     let i = 0
+    if (currentLevel) {
+      const items = currentLevel.items.filter((it) =>
+        currentLevel.match ? currentLevel.match(it, cascadeQuery) : true,
+      )
+      return [
+        {
+          id: '__cascade__',
+          items: items.map((item) => ({
+            item,
+            index: i++,
+            branch: !!currentLevel.getChildren,
+            renderItem: currentLevel.renderItem,
+            onSelect: currentLevel.onSelect,
+            getChildren: currentLevel.getChildren,
+          })),
+        },
+      ]
+    }
     return activeSources
       .filter((s) => s.kind !== 'custom')
       .map((source) => ({
-        source,
-        items: source.items.map((item) => ({ item, index: i++ })),
+        id: source.id,
+        label: source.group,
+        loading: source.loading,
+        items: source.items.map((item) => ({
+          item,
+          index: i++,
+          branch: !!source.getChildren,
+          renderItem: source.renderItem,
+          onSelect: source.onSelect,
+          getChildren: source.getChildren,
+        })),
       }))
-  }, [activeSources])
+  }, [activeSources, menuVersion, currentLevel, cascadeQuery])
 
-  const candidates: Candidate[] = useMemo(
-    () =>
-      groups.flatMap((g) =>
-        g.items.map(({ item }) => ({ sourceId: g.source.id, item })),
-    ),
+  const flat: ViewItem[] = useMemo(
+    () => groups.flatMap((g) => g.items),
     [groups],
   )
-  const candidatesRef = useRef(candidates)
-  candidatesRef.current = candidates
+  const flatRef = useRef(flat)
+  flatRef.current = flat
+
+  const drill = useCallback((vi: ViewItem) => {
+    if (!vi.getChildren) return
+    const child = vi.getChildren(vi.item)
+    if (!child) return
+    setPath((p) => [...p, { label: child.label ?? '', level: child }])
+    setCascadeQuery('')
+    setHighlighted(0)
+  }, [])
+
+  const pop = useCallback(() => {
+    setPath((p) => p.slice(0, -1))
+    setCascadeQuery('')
+    setHighlighted(0)
+  }, [])
 
   const choose = useCallback(
     (index: number) => {
-      const c = candidatesRef.current[index]
-      if (!c) return
-      const source = registryRef.current.get(c.sourceId)
-      if (!source) return
+      const vi = flatRef.current[index]
+      if (!vi) return
+      if (vi.branch) {
+        drill(vi)
+        return
+      }
+      if (!vi.onSelect) return
       const matchStart = matchStartRef.current
-      const result = source.onSelect(c.item)
+      const result = vi.onSelect(vi.item)
       if (isPendingSelect(result)) {
         // Optimistic placeholder now, real node re-anchored by key later (§4.8).
         close()
@@ -192,7 +269,7 @@ export function TriggerComposer({
       applySelectResult(editor, matchStart, result)
       close()
     },
-    [editor, close],
+    [editor, close, drill],
   )
 
   // Detection: scan text before the caret, arbitrate activeChar/query/match.
@@ -244,13 +321,32 @@ export function TriggerComposer({
     })
   }, [editor, close])
 
-  // Keyboard navigation, scoped to whichever source has the highlighted item.
+  // Keyboard navigation. Cascade adds → (drill), ← / Backspace (back), and
+  // type-to-filter once drilled (spec §4.11). 'custom' sources opt out entirely.
   useEffect(() => {
+    const drilled = () => pathRef.current.length > 0
     return mergeRegister(
+      // Type-to-filter inside a drilled cascade level. Top level keeps flowing
+      // typed chars to the editor (they drive the source query via React Query).
+      editor.registerCommand(
+        KEY_DOWN_COMMAND,
+        (event) => {
+          if (!activeCharRef.current || hasCustomRef.current || !drilled())
+            return false
+          const k = event.key
+          if (k.length !== 1 || event.ctrlKey || event.metaKey || event.altKey)
+            return false
+          event.preventDefault()
+          setCascadeQuery((q) => q + k)
+          setHighlighted(0)
+          return true
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
       editor.registerCommand(
         KEY_ARROW_DOWN_COMMAND,
         (event) => {
-          const len = candidatesRef.current.length
+          const len = flatRef.current.length
           if (!activeCharRef.current || hasCustomRef.current || len === 0)
             return false
           event?.preventDefault()
@@ -262,11 +358,34 @@ export function TriggerComposer({
       editor.registerCommand(
         KEY_ARROW_UP_COMMAND,
         (event) => {
-          const len = candidatesRef.current.length
+          const len = flatRef.current.length
           if (!activeCharRef.current || hasCustomRef.current || len === 0)
             return false
           event?.preventDefault()
           setHighlighted((h) => (h - 1 + len) % len)
+          return true
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_RIGHT_COMMAND,
+        (event) => {
+          if (!activeCharRef.current || hasCustomRef.current) return false
+          const vi = flatRef.current[highlightedRef.current]
+          if (!vi?.branch) return false
+          event?.preventDefault()
+          drill(vi)
+          return true
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_LEFT_COMMAND,
+        (event) => {
+          if (!activeCharRef.current || hasCustomRef.current || !drilled())
+            return false
+          event?.preventDefault()
+          pop()
           return true
         },
         COMMAND_PRIORITY_LOW,
@@ -278,7 +397,7 @@ export function TriggerComposer({
           if (
             !activeCharRef.current ||
             hasCustomRef.current ||
-            candidatesRef.current.length === 0
+            flatRef.current.length === 0
           ) {
             return false
           }
@@ -294,12 +413,30 @@ export function TriggerComposer({
           if (
             !activeCharRef.current ||
             hasCustomRef.current ||
-            candidatesRef.current.length === 0
+            flatRef.current.length === 0
           ) {
             return false
           }
           event?.preventDefault()
           choose(highlightedRef.current)
+          return true
+        },
+        COMMAND_PRIORITY_CRITICAL,
+      ),
+      // Backspace only steps back while drilled: clear the in-level query, then
+      // pop a level. At the top level it falls through to normal text deletion.
+      editor.registerCommand(
+        KEY_BACKSPACE_COMMAND,
+        (event) => {
+          if (!activeCharRef.current || hasCustomRef.current || !drilled())
+            return false
+          event?.preventDefault()
+          if (cascadeQueryRef.current) {
+            setCascadeQuery((q) => q.slice(0, -1))
+            setHighlighted(0)
+          } else {
+            pop()
+          }
           return true
         },
         COMMAND_PRIORITY_CRITICAL,
@@ -314,7 +451,7 @@ export function TriggerComposer({
         COMMAND_PRIORITY_CRITICAL,
       ),
     )
-  }, [editor, choose, close])
+  }, [editor, choose, close, drill, pop])
 
   // Dev-only mutual-exclusion check: a char may host N 'menu' sources OR exactly
   // one 'custom' source, never both. Deferred to a macrotask so StrictMode double
@@ -347,8 +484,9 @@ export function TriggerComposer({
 
   // A custom source draws its own UI, so the engine hides the merged menu.
   const showMenu = activeChar !== null && rect !== null && !hasCustom
-  const hasItems = candidates.length > 0
-  const anyLoading = groups.some((g) => g.source.loading)
+  const hasItems = flat.length > 0
+  const anyLoading = groups.some((g) => g.loading)
+  const breadcrumb = path.map((p) => p.label).filter(Boolean).join(' › ')
 
   return (
     <TriggerComposerContext.Provider value={engine}>
@@ -365,26 +503,35 @@ export function TriggerComposer({
               zIndex: 50,
             }}
           >
+            {path.length > 0 && (
+              <li
+                className="px-2 py-1 text-xs text-muted-foreground"
+                data-testid="mention-breadcrumb"
+              >
+                ‹ {breadcrumb}
+                {cascadeQuery && ` ${cascadeQuery}`}
+              </li>
+            )}
             {!hasItems ? (
               <li className="px-2 py-1.5 text-muted-foreground">
                 {anyLoading ? 'Loading…' : 'No results'}
               </li>
             ) : (
               groups.map((group) => (
-                <Fragment key={group.source.id}>
-                  {group.source.group && (
+                <Fragment key={group.id}>
+                  {group.label && (
                     <li
                       className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground"
                       data-testid="mention-group"
                     >
-                      {group.source.group}
+                      {group.label}
                     </li>
                   )}
-                  {group.source.loading && group.items.length === 0 ? (
+                  {group.loading && group.items.length === 0 ? (
                     <li className="px-2 py-1.5 text-muted-foreground">Loading…</li>
                   ) : (
-                    group.items.map(({ item, index }) => {
-                      const isActive = index === highlighted
+                    group.items.map((vi) => {
+                      const isActive = vi.index === highlighted
                       return (
                         <li
                           className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 ${
@@ -393,15 +540,18 @@ export function TriggerComposer({
                           data-active={isActive}
                           data-testid="mention-item"
                           // biome-ignore lint/suspicious/noArrayIndexKey: stable within a render
-                          key={index}
+                          key={vi.index}
                           // onMouseDown + preventDefault keeps editor focus.
                           onMouseDown={(event) => {
                             event.preventDefault()
-                            choose(index)
+                            choose(vi.index)
                           }}
-                          onMouseEnter={() => setHighlighted(index)}
+                          onMouseEnter={() => setHighlighted(vi.index)}
                         >
-                          {group.source.renderItem(item)}
+                          {vi.renderItem(vi.item)}
+                          {vi.branch && (
+                            <span className="text-muted-foreground">›</span>
+                          )}
                         </li>
                       )
                     })

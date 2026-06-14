@@ -13,6 +13,7 @@ export { useTriggerSlot } from './trigger-composer/use-trigger-slot'
 export type { TriggerSlot } from './trigger-composer/use-trigger-slot'
 export { useTriggerSource } from './trigger-composer/use-trigger-source'
 export type { TriggerSourceConfig } from './trigger-composer/use-trigger-source'
+export type { CascadeLevel } from './trigger-composer/context'
 export { useTypeaheadKeyboard } from './trigger-composer/use-typeahead-keyboard'
 export type { TypeaheadKeyboardHandlers } from './trigger-composer/use-typeahead-keyboard'
 export type {
