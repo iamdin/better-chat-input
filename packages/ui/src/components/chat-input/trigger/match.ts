@@ -1,13 +1,9 @@
-import type { MentionConfig } from './types'
-
 export interface TriggerMatch {
-  config: MentionConfig
-  /** The full matched run including the trigger char, e.g. "@Team Alpha/al". */
+  /** The trigger char that matched, e.g. "@". */
+  char: string
+  /** The full matched run including the trigger char, e.g. "@joh". */
   matched: string
-  /**
-   * The query after the trigger char. May contain spaces so multi-word names
-   * work, e.g. "Team Alpha". The caller decides if it resolves to candidates.
-   */
+  /** The query after the trigger char (may contain spaces). */
   query: string
 }
 
@@ -16,24 +12,22 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Match an active trigger at the end of the text preceding the caret.
- * A trigger fires only at the start of input or right after whitespace. The
- * query then runs until the caret and MAY contain spaces (so multi-word names
- * like "Team Alpha" work) — it stops only at a newline or another trigger char,
- * which anchors the match to the most recent trigger. Whether the query actually
- * resolves to candidates is decided by the caller. Returns the first config that
- * matches, or null.
+ * Match an active trigger at the end of the text preceding the caret against a
+ * set of trigger chars. A trigger fires only at the start of input or right
+ * after whitespace; the query runs until the caret and may contain spaces (it
+ * stops at a newline or another trigger char, anchoring to the most recent
+ * trigger). Returns the first matching char, or null.
  */
 export function matchTrigger(
   textToCursor: string,
-  configs: MentionConfig[],
+  triggers: string[],
 ): TriggerMatch | null {
-  for (const config of configs) {
-    const t = escapeRegExp(config.trigger)
+  for (const char of triggers) {
+    const t = escapeRegExp(char)
     const re = new RegExp(`(?:^|\\s)(${t}([^${t}\\n]*))$`, 'u')
     const m = textToCursor.match(re)
     if (m) {
-      return { config, matched: m[1] ?? '', query: m[2] ?? '' }
+      return { char, matched: m[1] ?? '', query: m[2] ?? '' }
     }
   }
   return null
