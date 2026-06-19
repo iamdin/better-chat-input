@@ -87,7 +87,7 @@ export function ChatInput({
       <TriggerComposer charConfig={charConfig}>
         <TagRenderers specs={tagRenderers} />
         <OnReady onReady={onReady} />
-        <div className="relative rounded-md border border-input bg-transparent text-sm focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+        <div className="relative rounded-lg border border-input bg-background text-sm shadow-xs/5 transition-[color,box-shadow] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/6%)] focus-within:border-ring focus-within:shadow-none focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/32 dark:before:shadow-[0_-1px_--theme(--color-white/6%)]">
           <RichTextPlugin
             contentEditable={
               <ContentEditable className="min-h-20 w-full px-3 py-2 outline-none" />
