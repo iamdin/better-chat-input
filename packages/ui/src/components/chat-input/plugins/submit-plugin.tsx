@@ -48,8 +48,20 @@ export function registerSubmit(editor: LexicalEditor, opts: SubmitOptions): () =
   )
 }
 
-export function SubmitPlugin(opts: SubmitOptions): null {
+/**
+ * Wire Enter-to-submit into the surrounding editor. Submitting is behaviour, not
+ * rendering, so this is a hook — host it in any null component inside your
+ * `<LexicalComposer>`. `enterBehavior` defaults to 'submit' (Enter submits,
+ * Shift+Enter newlines); 'newline' swaps them.
+ */
+export function useSubmit(opts: {
+  onSubmit: (payload: SubmitPayload) => void
+  enterBehavior?: 'submit' | 'newline'
+}): void {
   const [editor] = useLexicalComposerContext()
-  useEffect(() => registerSubmit(editor, opts), [editor, opts.onSubmit, opts.enterBehavior])
-  return null
+  const { onSubmit, enterBehavior = 'submit' } = opts
+  useEffect(
+    () => registerSubmit(editor, { onSubmit, enterBehavior }),
+    [editor, onSubmit, enterBehavior],
+  )
 }

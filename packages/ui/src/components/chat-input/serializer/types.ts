@@ -1,7 +1,8 @@
 import type { SerializedEditorState } from 'lexical'
 
-export interface TagEntity {
-  tagType: string
+export interface Entity {
+  /** The node kind, from the EntityNode subclass's `getType()` (e.g. 'user'). */
+  type: string
   data: Record<string, unknown>
 }
 
@@ -20,8 +21,8 @@ export interface FilePayload {
 export interface SubmitPayload {
   /** Plain text; each tag is one ￼ (U+FFFC) placeholder. */
   text: string
-  /** Structured tags, in document order; entities[i] is the i-th ￼ in text. */
-  entities: TagEntity[]
+  /** Structured entities, in document order; entities[i] is the i-th ￼ in text. */
+  entities: Entity[]
   images: ImagePayload[]
   files: FilePayload[]
   isEmpty: boolean

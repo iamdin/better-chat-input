@@ -1,31 +1,29 @@
 import { $getRoot, $isElementNode, type EditorState } from 'lexical'
-import { $isTagNode } from '../tag/tag-node'
-import type { SubmitPayload, TagEntity } from './types'
+import { $isEntityNode } from '../entity/entity-node'
+import type { Entity, SubmitPayload } from './types'
 
-const TAG_PLACEHOLDER = '￼' // OBJECT REPLACEMENT CHARACTER (U+FFFC)
+const ENTITY_PLACEHOLDER = '￼' // OBJECT REPLACEMENT CHARACTER (U+FFFC)
 
 export function serializeEditorState(state: EditorState): SubmitPayload {
   return state.read(() => {
     let text = ''
-    const entities: TagEntity[] = []
+    const entities: Entity[] = []
 
     const top = $getRoot().getChildren()
     top.forEach((node, index) => {
       if (index > 0) text += '\n'
       if ($isElementNode(node)) {
         for (const child of node.getChildren()) {
-          if ($isTagNode(child)) {
-            const tag = child.getTag()
-            entities.push({ tagType: tag.tagType, data: { ...tag.data } })
-            text += TAG_PLACEHOLDER
+          if ($isEntityNode(child)) {
+            entities.push({ type: child.getType(), data: { ...child.getData() } })
+            text += ENTITY_PLACEHOLDER
           } else {
             text += child.getTextContent()
           }
         }
-      } else if ($isTagNode(node)) {
-        const tag = node.getTag()
-        entities.push({ tagType: tag.tagType, data: { ...tag.data } })
-        text += TAG_PLACEHOLDER
+      } else if ($isEntityNode(node)) {
+        entities.push({ type: node.getType(), data: { ...node.getData() } })
+        text += ENTITY_PLACEHOLDER
       } else {
         text += node.getTextContent()
       }

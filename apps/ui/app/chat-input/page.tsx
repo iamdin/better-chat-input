@@ -1,42 +1,193 @@
 "use client";
 
+import type {
+  CascadeLevel,
+  SerializedEntity,
+} from "@coss/ui/components/chat-input";
 import {
-  $createTagNode,
-  type CharMatchConfig,
-  ChatInput,
+  ChatContent,
+  createEntity,
+  EntityNode,
+  Triggers,
+  useSubmit,
   useTrigger,
 } from "@coss/ui/components/chat-input";
+import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import {
   QueryClient,
   QueryClientProvider,
   useQuery,
 } from "@tanstack/react-query";
+import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
+
+/* -------------------------------------------------------------------------- */
+/* 1. Entity nodes — one ordinary subclass per kind, defined by the app.       */
+/*    Each owns its appearance in decorate(); no factory, no renderer registry. */
+/* -------------------------------------------------------------------------- */
+
+// Shared pill — DRY lives in one presentational component (Folo's MentionLikePill
+// idea), keyed by a variant, not in a node base class.
+const PILL_STYLE: Record<string, CSSProperties> = {
+  command: { color: "#7c3aed", fontFamily: "ui-monospace, monospace" },
+  file: { background: "#e0ffe8", borderRadius: 4, padding: "0 4px" },
+  "team-member": { background: "#ffe8d6", borderRadius: 4, padding: "0 4px" },
+  user: { background: "#e0ecff", borderRadius: 4, padding: "0 4px" },
+};
+
+function EntityPill({
+  variant,
+  children,
+}: {
+  variant: keyof typeof PILL_STYLE;
+  children: ReactNode;
+}) {
+  return (
+    <span data-testid="tag-pill" style={PILL_STYLE[variant]}>
+      {children}
+    </span>
+  );
+}
+
+interface UserData {
+  id: string;
+  name: string;
+}
+class UserNode extends EntityNode<UserData> {
+  static getType() {
+    return "user";
+  }
+  static clone(node: UserNode) {
+    return new UserNode(node.__data, node.__key);
+  }
+  static importJSON(json: SerializedEntity<UserData>) {
+    return $createUserNode(json.data);
+  }
+  static importDOM() {
+    return EntityNode.importDOMFor("user", (d) =>
+      $createUserNode(d as unknown as UserData),
+    );
+  }
+  override getTextContent() {
+    return `@${this.__data.name}`;
+  }
+  decorate() {
+    return <EntityPill variant="user">@{this.__data.name}</EntityPill>;
+  }
+}
+const $createUserNode = (data: UserData) => createEntity(UserNode, data);
+
+interface FileData {
+  id: string;
+  name: string;
+  path: string;
+}
+class FileNode extends EntityNode<FileData> {
+  static getType() {
+    return "file";
+  }
+  static clone(node: FileNode) {
+    return new FileNode(node.__data, node.__key);
+  }
+  static importJSON(json: SerializedEntity<FileData>) {
+    return $createFileNode(json.data);
+  }
+  static importDOM() {
+    return EntityNode.importDOMFor("file", (d) =>
+      $createFileNode(d as unknown as FileData),
+    );
+  }
+  // Plain-text form is the path (useful pasted into code), decoupled from the 📄 pill.
+  override getTextContent() {
+    return this.__data.path;
+  }
+  decorate() {
+    return <EntityPill variant="file">📄{this.__data.name}</EntityPill>;
+  }
+}
+const $createFileNode = (data: FileData) => createEntity(FileNode, data);
+
+interface CommandData {
+  name: string;
+}
+class CommandNode extends EntityNode<CommandData> {
+  static getType() {
+    return "command";
+  }
+  static clone(node: CommandNode) {
+    return new CommandNode(node.__data, node.__key);
+  }
+  static importJSON(json: SerializedEntity<CommandData>) {
+    return $createCommandNode(json.data);
+  }
+  static importDOM() {
+    return EntityNode.importDOMFor("command", (d) =>
+      $createCommandNode(d as unknown as CommandData),
+    );
+  }
+  override getTextContent() {
+    return `/${this.__data.name}`;
+  }
+  decorate() {
+    return <EntityPill variant="command">/{this.__data.name}</EntityPill>;
+  }
+}
+const $createCommandNode = (data: CommandData) =>
+  createEntity(CommandNode, data);
+
+interface MemberData {
+  id: string;
+  name: string;
+}
+class TeamMemberNode extends EntityNode<MemberData> {
+  static getType() {
+    return "team-member";
+  }
+  static clone(node: TeamMemberNode) {
+    return new TeamMemberNode(node.__data, node.__key);
+  }
+  static importJSON(json: SerializedEntity<MemberData>) {
+    return $createTeamMemberNode(json.data);
+  }
+  static importDOM() {
+    return EntityNode.importDOMFor("team-member", (d) =>
+      $createTeamMemberNode(d as unknown as MemberData),
+    );
+  }
+  override getTextContent() {
+    return `@${this.__data.name}`;
+  }
+  decorate() {
+    return <EntityPill variant="team-member">@{this.__data.name}</EntityPill>;
+  }
+}
+const $createTeamMemberNode = (data: MemberData) =>
+  createEntity(TeamMemberNode, data);
+
+const NODES = [UserNode, FileNode, CommandNode, TeamMemberNode];
+
+/* -------------------------------------------------------------------------- */
+/* 2. Data sources (simulated async APIs) + the useItems hooks.                */
+/* -------------------------------------------------------------------------- */
 
 interface User {
   id: string;
   name: string;
 }
-
 interface FileItem {
   id: string;
   name: string;
   path: string;
 }
-
 interface Member {
   id: string;
   name: string;
 }
-
 interface Team {
   id: string;
-  name: string;
   members: Member[];
+  name: string;
 }
-
-// A slash command. Like a mention, confirming one drops a tag into the editor —
-// just a lighter, background-less one (the `command` tag renderer below).
 interface Command {
   hint: string;
   name: string;
@@ -49,14 +200,12 @@ const USERS: User[] = [
   { id: "u4", name: "Carol" },
   { id: "u5", name: "张三" },
 ];
-
 const FILES: FileItem[] = [
   { id: "f1", name: "app.tsx", path: "/src/app.tsx" },
   { id: "f2", name: "index.ts", path: "/src/index.ts" },
   { id: "f3", name: "README.md", path: "/README.md" },
   { id: "f4", name: "package.json", path: "/package.json" },
 ];
-
 const TEAMS: Team[] = [
   {
     id: "t1",
@@ -76,75 +225,6 @@ const TEAMS: Team[] = [
     name: "Team Beta",
   },
 ];
-
-// Simulated async data sources (stand in for API calls).
-function searchUsers(query: string): Promise<User[]> {
-  const q = query.toLowerCase();
-  return new Promise((resolve) => {
-    setTimeout(
-      () => resolve(USERS.filter((u) => u.name.toLowerCase().includes(q))),
-      150,
-    );
-  });
-}
-
-function searchFiles(query: string): Promise<FileItem[]> {
-  const q = query.toLowerCase();
-  return new Promise((resolve) => {
-    setTimeout(
-      () => resolve(FILES.filter((f) => f.name.toLowerCase().includes(q))),
-      150,
-    );
-  });
-}
-
-function searchTeams(query: string): Promise<Team[]> {
-  const q = query.toLowerCase();
-  return new Promise((resolve) => {
-    setTimeout(
-      () => resolve(TEAMS.filter((t) => t.name.toLowerCase().includes(q))),
-      150,
-    );
-  });
-}
-
-// useTrigger's `useItems` is a hook, so the candidate fetch lives in a hook of
-// its own (named use* so it can call useQuery). It is gated on `active` and keyed
-// on `query` — this is the bridge that lets items depend on the live query.
-function useUserItems(query: string, active: boolean) {
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchUsers(query),
-    queryKey: ["users", query],
-  });
-  return { items: data ?? [], loading: isLoading };
-}
-
-function useFileItems(query: string, active: boolean) {
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchFiles(query),
-    queryKey: ["files", query],
-  });
-  return { items: data ?? [], loading: isLoading };
-}
-
-function useTeamItems(query: string, active: boolean) {
-  const { data, isLoading } = useQuery({
-    enabled: active,
-    queryFn: () => searchTeams(query),
-    queryKey: ["teams", query],
-  });
-  return { items: data ?? [], loading: isLoading };
-}
-
-// Slash commands fire only at the very start of the input and stop at the first
-// whitespace — a custom per-char pattern (§4.6) instead of the @-style boundary
-// that fires anywhere. `^\/` anchors to the start; `[^/\s]*` is the command word.
-const CHAR_CONFIG: Record<string, CharMatchConfig> = {
-  "/": { pattern: /^\/([^/\s]*)$/u },
-};
-
 const COMMANDS: Command[] = [
   { hint: "generate an image from a prompt", name: "image" },
   { hint: "format the reply as code", name: "code" },
@@ -152,88 +232,87 @@ const COMMANDS: Command[] = [
   { hint: "use extended thinking", name: "think" },
 ];
 
-const queryClient = new QueryClient();
+function delay<T>(value: T): Promise<T> {
+  return new Promise((resolve) => setTimeout(() => resolve(value), 150));
+}
 
-// Three independent, self-registering plugins all using '@' — the engine merges
-// them into one menu (spec §4.3). Users and Files are flat groups; Teams is a
-// cascade source whose items drill into members, all in the same menu (§4.11).
-function UserMentionPlugin() {
+function useUserItems(query: string, active: boolean) {
+  const q = query.toLowerCase();
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => delay(USERS.filter((u) => u.name.toLowerCase().includes(q))),
+    queryKey: ["users", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
+function useFileItems(query: string, active: boolean) {
+  const q = query.toLowerCase();
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => delay(FILES.filter((f) => f.name.toLowerCase().includes(q))),
+    queryKey: ["files", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
+function useTeamItems(query: string, active: boolean) {
+  const q = query.toLowerCase();
+  const { data, isLoading } = useQuery({
+    enabled: active,
+    queryFn: () => delay(TEAMS.filter((t) => t.name.toLowerCase().includes(q))),
+    queryKey: ["teams", query],
+  });
+  return { items: data ?? [], loading: isLoading };
+}
+
+/* -------------------------------------------------------------------------- */
+/* 3. Triggers — each a useTrigger host (returns null). Compose by adding more. */
+/* -------------------------------------------------------------------------- */
+
+function UserMention() {
   useTrigger<User>({
     char: "@",
     group: "Users",
     id: "user",
     onSelect: (u) => ({
-      toNode: () =>
-        $createTagNode("user", { id: u.id, name: u.name, text: `@${u.name}` }),
+      toNode: () => $createUserNode({ id: u.id, name: u.name }),
     }),
     order: 0,
     renderItem: (u) => <span>@{u.name}</span>,
-    renderTag: (d) => (
-      <span
-        data-testid="tag-pill"
-        style={{ background: "#e0ecff", borderRadius: 4, padding: "0 4px" }}
-      >
-        @{String(d.name)}
-      </span>
-    ),
-    tagType: "user",
     useItems: useUserItems,
   });
   return null;
 }
 
-function FileMentionPlugin() {
+function FileMention() {
   useTrigger<FileItem>({
     char: "@",
     group: "Files",
     id: "file",
-    // Selection is synchronous, like the other mentions. The *async* part of this
-    // demo is the data source (useItems): candidates are fetched via React Query,
-    // which renders the menu's "Loading…" state.
     onSelect: (f) => ({
-      toNode: () =>
-        // Plain-text copy is the path (useful pasted into code/terminal), not the
-        // 📄 pill — copy text is decoupled from the rendered form.
-        $createTagNode("file", {
-          id: f.id,
-          name: f.name,
-          path: f.path,
-          text: f.path,
-        }),
+      toNode: () => $createFileNode({ id: f.id, name: f.name, path: f.path }),
     }),
     order: 1,
     renderItem: (f) => <span>📄 {f.name}</span>,
-    renderTag: (d) => (
-      <span
-        data-testid="tag-pill"
-        style={{ background: "#e0ffe8", borderRadius: 4, padding: "0 4px" }}
-      >
-        📄{String(d.name)}
-      </span>
-    ),
-    tagType: "file",
     useItems: useFileItems,
   });
   return null;
 }
 
-// A cascade source (spec §4.11, declarative): it lives in the same '@' menu as
-// the flat groups above, but its items drill into team members. The engine
-// renders the breadcrumb, drives → / ← / type-to-filter — no custom panel.
-function TeamMentionPlugin() {
+function TeamMention() {
   useTrigger<Team>({
     char: "@",
-    getChildren: (t) => ({
+    getChildren: (t): CascadeLevel => ({
       items: t.members,
       label: t.name,
       match: (m, q) =>
         (m as Member).name.toLowerCase().includes(q.toLowerCase()),
       onSelect: (m) => ({
         toNode: () =>
-          $createTagNode("team-member", {
+          $createTeamMemberNode({
             id: (m as Member).id,
             name: (m as Member).name,
-            text: `@${(m as Member).name}`,
           }),
       }),
       renderItem: (m) => <span>@{(m as Member).name}</span>,
@@ -242,50 +321,26 @@ function TeamMentionPlugin() {
     id: "team",
     order: 2,
     renderItem: (t) => <span>👥 {t.name}</span>,
-    renderTag: (d) => (
-      <span
-        data-testid="tag-pill"
-        style={{ background: "#ffe8d6", borderRadius: 4, padding: "0 4px" }}
-      >
-        @{String(d.name)}
-      </span>
-    ),
-    tagType: "team-member",
     useItems: useTeamItems,
   });
   return null;
 }
 
-// A slash-command plugin on its own '/' char (not '@'). It mirrors the mention
-// plugins — confirming a command inserts a tag — but the `command` tag renderer
-// is deliberately lighter than the colored mention pills: no background, just a
-// muted monospace `/name`. Commands are local and static, so it filters in place.
-function SlashCommandPlugin() {
+function SlashCommands() {
   useTrigger<Command>({
     char: "/",
     group: "Commands",
     id: "slash",
-    onSelect: (c) => ({
-      toNode: () =>
-        $createTagNode("command", { name: c.name, text: `/${c.name}` }),
-    }),
+    onSelect: (c) => ({ toNode: () => $createCommandNode({ name: c.name }) }),
     order: 3,
+    // Per-char rule lives right here: only at the start of the line, stop at space.
+    pattern: /^\/([^/\s]*)$/u,
     renderItem: (c) => (
       <span>
         <strong>/{c.name}</strong>{" "}
         <span style={{ color: "#888" }}>{c.hint}</span>
       </span>
     ),
-    renderTag: (d) => (
-      <span
-        data-testid="tag-pill"
-        style={{ color: "#7c3aed", fontFamily: "ui-monospace, monospace" }}
-      >
-        /{String(d.name)}
-      </span>
-    ),
-    tagType: "command",
-    // Local + static: no fetch, just filter the fixed list by the query.
     useItems: (query, active) => {
       const q = query.toLowerCase();
       return {
@@ -298,6 +353,17 @@ function SlashCommandPlugin() {
   return null;
 }
 
+function SubmitHost({ onSubmit }: { onSubmit: (text: string) => void }) {
+  useSubmit({ onSubmit: (p) => onSubmit(JSON.stringify(p, null, 2)) });
+  return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 4. Composition — the app owns the LexicalComposer and registers its nodes.  */
+/* -------------------------------------------------------------------------- */
+
+const queryClient = new QueryClient();
+
 export default function ChatInputShowcase() {
   const [last, setLast] = useState(
     "Type @ — Users and Files are flat groups; Teams is a cascade, all in one menu.",
@@ -309,28 +375,29 @@ export default function ChatInputShowcase() {
       >
         <h1>ChatInput</h1>
         <p style={{ color: "#666", fontSize: 14 }}>
-          Type <code>@</code>: one merged menu with two flat groups (Users,
-          Files) and a <strong>cascade</strong> source (Teams → members). Use ↑↓
-          to navigate, → / Enter to drill a team, ← / Backspace to go back, and
-          just type to filter — flat and cascade sources coexist. All React
-          Query–driven.
+          Headless: the app owns the <code>LexicalComposer</code>, registers its{" "}
+          <code>EntityNode</code> subclasses, and composes{" "}
+          <code>ChatContent</code> + <code>Triggers</code> +{" "}
+          <code>useTrigger</code> hosts.
         </p>
-        <p style={{ color: "#666", fontSize: 14 }}>
-          Type <code>/</code> at the start of the line for{" "}
-          <strong>slash commands</strong> — a separate trigger char that, like a
-          mention, drops a tag on confirm. The <code>command</code> tag is just
-          lighter: no background, a muted monospace <code>/name</code>.
-        </p>
-        <ChatInput
-          charConfig={CHAR_CONFIG}
-          onSubmit={(p) => setLast(JSON.stringify(p, null, 2))}
-          placeholder="Message — @ for mentions, / for commands…"
+        <LexicalComposer
+          initialConfig={{
+            namespace: "chat-input",
+            nodes: NODES,
+            onError: (error) => {
+              throw error;
+            },
+          }}
         >
-          <UserMentionPlugin />
-          <FileMentionPlugin />
-          <TeamMentionPlugin />
-          <SlashCommandPlugin />
-        </ChatInput>
+          <ChatContent placeholder="Message — @ for mentions, / for commands…" />
+          <Triggers>
+            <UserMention />
+            <FileMention />
+            <TeamMention />
+            <SlashCommands />
+          </Triggers>
+          <SubmitHost onSubmit={setLast} />
+        </LexicalComposer>
         <pre
           data-testid="payload"
           style={{ background: "#f6f6f6", padding: 12, whiteSpace: "pre-wrap" }}

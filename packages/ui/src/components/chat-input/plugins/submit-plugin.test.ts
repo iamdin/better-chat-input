@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $getRoot, $createParagraphNode, $createTextNode, KEY_ENTER_COMMAND } from 'lexical'
-import { TagNode } from '../tag/tag-node'
+import { UserNode } from '../entity/test-node'
 import type { SubmitPayload } from '../serializer/types'
 import { registerSubmit } from './submit-plugin'
 
 function editorWithText(text: string) {
-  const editor = createHeadlessEditor({ namespace: 'test', nodes: [TagNode], onError: (e) => { throw e } })
+  const editor = createHeadlessEditor({ namespace: 'test', nodes: [UserNode], onError: (e) => { throw e } })
   editor.update(() => {
     $getRoot().append($createParagraphNode().append($createTextNode(text)))
   }, { discrete: true })

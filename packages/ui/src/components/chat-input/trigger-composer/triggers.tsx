@@ -26,8 +26,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { $isTagNode } from '../tag/tag-node'
-import { TagRendererContext, useTagRendererStore } from '../tag/tag-renderer-context'
+import { $isEntityNode } from '../entity/entity-node'
 import { type CharMatchConfig, matchTrigger } from '../trigger/match'
 import {
   anchorPending,
@@ -62,34 +61,23 @@ interface ViewGroup {
 }
 
 /**
- * The single arbitration hub for triggers (spec §4): it detects the trigger
- * char in the text, holds the source registry, merges all sources sharing the
- * active char into one menu, drives keyboard navigation, and applies the chosen
- * source's SelectResult. Trigger plugins self-register via the single useTrigger
- * hook — there is no central config array.
+ * The trigger engine (spec §4): it detects the trigger char in the text, holds
+ * the source registry, merges all sources sharing the active char into one menu,
+ * drives keyboard navigation, applies the chosen source's SelectResult, and
+ * renders the merged menu. Trigger plugins self-register via the single
+ * `useTrigger` hook — there is no central config array.
+ *
+ * It is a sibling of the editor surface (`<ChatContent>`), not a wrapper: it only
+ * needs to provide context to its `children` (the `useTrigger` hosts) and live
+ * inside the same `LexicalComposer`. Per-char match rules come from each trigger
+ * (`stopOnWhitespace`/`pattern`), not a central prop.
  *
  * Sources may be flat (grouped) or cascade (`getChildren`): both render in the
  * same merged menu, and the engine drills/returns through cascade levels with a
  * breadcrumb (spec §4.11). Fully custom UIs still use the `kind: 'custom'` slot.
  */
-export function TriggerComposer({
-  children,
-  charConfig,
-}: {
-  children?: ReactNode
-  /** Per-char query matching (CJK boundary, stopOnWhitespace, custom pattern). */
-  charConfig?: Record<string, CharMatchConfig>
-}) {
+export function Triggers({ children }: { children?: ReactNode }) {
   const [editor] = useLexicalComposerContext()
-
-  // Tag renderers live here too, so one component assembles triggers, sources,
-  // and tag appearance. The context is defined in the tag layer; we only provide
-  // its value (see tag-renderer-context.ts) — TagNode reads it to draw its pill.
-  const tagRegistry = useTagRendererStore()
-
-  // Latest charConfig without re-subscribing the detection listener.
-  const charConfigRef = useRef(charConfig)
-  charConfigRef.current = charConfig
 
   // Source registry: mutable ref + a version that only re-renders the menu (not
   // slot consumers), so per-render item churn stays cheap (spec §4.4).
@@ -289,6 +277,12 @@ export function TriggerComposer({
         if (activeCharRef.current) close()
         return
       }
+      // Per-char match rules come from the triggers themselves (first source of a
+      // char to declare `match` wins, spec §4.6) — no central charConfig prop.
+      const charConfig: Record<string, CharMatchConfig> = {}
+      for (const s of registryRef.current.values()) {
+        if (s.match && !(s.char in charConfig)) charConfig[s.char] = s.match
+      }
       const found = editorState.read(() => {
         const sel = $getSelection()
         if (!$isRangeSelection(sel) || !sel.isCollapsed()) return null
@@ -297,12 +291,12 @@ export function TriggerComposer({
         const node = anchor.getNode()
         if (!$isTextNode(node)) return null
         const textToCursor = node.getTextContent().slice(0, anchor.offset)
-        const matched = matchTrigger(textToCursor, triggers, charConfigRef.current)
+        const matched = matchTrigger(textToCursor, triggers, charConfig)
         if (!matched) return null
         const leadOffset = anchor.offset - matched.matched.length
         // Suppress @tag@ chains: a trigger at the very start of a text node that
         // directly follows a TagNode does not activate (spec §4.6 / §5.3).
-        if (leadOffset === 0 && $isTagNode(node.getPreviousSibling())) return null
+        if (leadOffset === 0 && $isEntityNode(node.getPreviousSibling())) return null
         return {
           char: matched.char,
           query: matched.query,
@@ -495,81 +489,79 @@ export function TriggerComposer({
   const breadcrumb = path.map((p) => p.label).filter(Boolean).join(' › ')
 
   return (
-    <TagRendererContext.Provider value={tagRegistry}>
-      <TriggerComposerContext.Provider value={engine}>
-        {children}
-        {showMenu &&
-          createPortal(
-            <ul
-              className="min-w-52 overflow-hidden rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
-              data-testid="mention-menu"
-              style={{
-                position: 'fixed',
-                top: rect.top + 4,
-                left: rect.left,
-                zIndex: 50,
-              }}
-            >
-              {path.length > 0 && (
-                <li
-                  className="px-2 py-1 text-xs text-muted-foreground"
-                  data-testid="mention-breadcrumb"
-                >
-                  ‹ {breadcrumb}
-                  {cascadeQuery && ` ${cascadeQuery}`}
-                </li>
-              )}
-              {!hasItems ? (
-                <li className="px-2 py-1.5 text-muted-foreground">
-                  {anyLoading ? 'Loading…' : 'No results'}
-                </li>
-              ) : (
-                groups.map((group) => (
-                  <Fragment key={group.id}>
-                    {group.label && (
-                      <li
-                        className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground"
-                        data-testid="mention-group"
-                      >
-                        {group.label}
-                      </li>
-                    )}
-                    {group.loading && group.items.length === 0 ? (
-                      <li className="px-2 py-1.5 text-muted-foreground">Loading…</li>
-                    ) : (
-                      group.items.map((vi) => {
-                        const isActive = vi.index === highlighted
-                        return (
-                          <li
-                            className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 ${
-                              isActive ? 'bg-accent text-accent-foreground' : ''
-                            }`}
-                            data-active={isActive}
-                            data-testid="mention-item"
-                            // biome-ignore lint/suspicious/noArrayIndexKey: stable within a render
-                            key={vi.index}
-                            // onMouseDown + preventDefault keeps editor focus.
-                            onMouseDown={(event) => {
-                              event.preventDefault()
-                              choose(vi.index)
-                            }}
-                            onMouseEnter={() => setHighlighted(vi.index)}
-                          >
-                            {vi.renderItem(vi.item)}
-                            {vi.branch && (
-                              <span className="text-muted-foreground">›</span>
-                            )}
-                          </li>
-                        )
-                      })
-                    )}
-                  </Fragment>
-                ))
-              )}
-            </ul>,
-            document.body,
-          )}
-      </TriggerComposerContext.Provider>
-    </TagRendererContext.Provider>
+    <TriggerComposerContext.Provider value={engine}>
+      {children}
+      {showMenu &&
+        createPortal(
+          <ul
+            className="min-w-52 overflow-hidden rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+            data-testid="mention-menu"
+            style={{
+              position: 'fixed',
+              top: rect.top + 4,
+              left: rect.left,
+              zIndex: 50,
+            }}
+          >
+            {path.length > 0 && (
+              <li
+                className="px-2 py-1 text-xs text-muted-foreground"
+                data-testid="mention-breadcrumb"
+              >
+                ‹ {breadcrumb}
+                {cascadeQuery && ` ${cascadeQuery}`}
+              </li>
+            )}
+            {!hasItems ? (
+              <li className="px-2 py-1.5 text-muted-foreground">
+                {anyLoading ? 'Loading…' : 'No results'}
+              </li>
+            ) : (
+              groups.map((group) => (
+                <Fragment key={group.id}>
+                  {group.label && (
+                    <li
+                      className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground"
+                      data-testid="mention-group"
+                    >
+                      {group.label}
+                    </li>
+                  )}
+                  {group.loading && group.items.length === 0 ? (
+                    <li className="px-2 py-1.5 text-muted-foreground">Loading…</li>
+                  ) : (
+                    group.items.map((vi) => {
+                      const isActive = vi.index === highlighted
+                      return (
+                        <li
+                          className={`flex cursor-pointer items-center justify-between rounded-sm px-2 py-1.5 ${
+                            isActive ? 'bg-accent text-accent-foreground' : ''
+                          }`}
+                          data-active={isActive}
+                          data-testid="mention-item"
+                          // biome-ignore lint/suspicious/noArrayIndexKey: stable within a render
+                          key={vi.index}
+                          // onMouseDown + preventDefault keeps editor focus.
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            choose(vi.index)
+                          }}
+                          onMouseEnter={() => setHighlighted(vi.index)}
+                        >
+                          {vi.renderItem(vi.item)}
+                          {vi.branch && (
+                            <span className="text-muted-foreground">›</span>
+                          )}
+                        </li>
+                      )
+                    })
+                  )}
+                </Fragment>
+              ))
+            )}
+          </ul>,
+          document.body,
+        )}
+    </TriggerComposerContext.Provider>
   )
 }

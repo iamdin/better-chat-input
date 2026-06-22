@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { createHeadlessEditor } from '@lexical/headless'
 import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical'
-import { TagNode, $createTagNode } from '../tag/tag-node'
+import { FileNode, UserNode, $createFileNode, $createUserNode } from '../entity/test-node'
 import { serializeEditorState } from './serialize'
 
 function editorWith() {
-  return createHeadlessEditor({ namespace: 'test', nodes: [TagNode], onError: (e) => { throw e } })
+  return createHeadlessEditor({ namespace: 'test', nodes: [UserNode, FileNode], onError: (e) => { throw e } })
 }
 
 describe('serializeEditorState', () => {
@@ -14,9 +14,9 @@ describe('serializeEditorState', () => {
     editor.update(() => {
       const p = $createParagraphNode()
       p.append($createTextNode('帮我看 '))
-      p.append($createTagNode('file', { id: 'f1', name: 'app.tsx' }))
+      p.append($createFileNode({ id: 'f1', name: 'app.tsx' }))
       p.append($createTextNode(' 和 '))
-      p.append($createTagNode('user', { id: 'u1', name: 'Alice' }))
+      p.append($createUserNode({ id: 'u1', name: 'Alice' }))
       p.append($createTextNode(' 写的'))
       $getRoot().append(p)
     }, { discrete: true })
@@ -24,8 +24,8 @@ describe('serializeEditorState', () => {
     const payload = serializeEditorState(editor.getEditorState())
     expect(payload.text).toBe('帮我看 ￼ 和 ￼ 写的')
     expect(payload.entities).toEqual([
-      { tagType: 'file', data: { id: 'f1', name: 'app.tsx' } },
-      { tagType: 'user', data: { id: 'u1', name: 'Alice' } },
+      { type: 'file', data: { id: 'f1', name: 'app.tsx' } },
+      { type: 'user', data: { id: 'u1', name: 'Alice' } },
     ])
     expect(payload.isEmpty).toBe(false)
     expect(payload.images).toEqual([])
@@ -52,7 +52,7 @@ describe('serializeEditorState', () => {
   test('a lone tag is not empty', () => {
     const editor = editorWith()
     editor.update(() => {
-      $getRoot().append($createParagraphNode().append($createTagNode('user', { name: 'Alice' })))
+      $getRoot().append($createParagraphNode().append($createUserNode({ name: 'Alice' })))
     }, { discrete: true })
     expect(serializeEditorState(editor.getEditorState()).isEmpty).toBe(false)
   })

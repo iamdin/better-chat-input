@@ -1,14 +1,12 @@
-export { ChatInput } from './chat-input'
-export type { ChatInputProps, TagRendererSpec } from './chat-input'
-export type { TagRenderer } from './tag/tag-renderer-context'
-export { TagNode, $createTagNode, $isTagNode } from './tag/tag-node'
-export type { TagData } from './tag/tag-node'
-export { EntityNode, createEntity } from './entity/entity-node'
-export type { SerializedEntity } from './entity/entity-node'
-export { serializeEditorState } from './serializer/serialize'
-export type { SubmitPayload, TagEntity, ImagePayload, FilePayload } from './serializer/types'
-export { SUBMIT_COMMAND } from './commands'
-export { TriggerComposer } from './trigger-composer/trigger-composer'
+// Headless chat input: atomic pieces you compose inside your own
+// <LexicalComposer>. There is no <ChatInput> god-component — mount <ChatContent>,
+// <Triggers>, your useTrigger hosts, and useSubmit, and register your EntityNode
+// subclasses in initialConfig.nodes.
+
+export { ChatContent } from './chat-content'
+export type { ChatContentProps } from './chat-content'
+
+export { Triggers } from './trigger-composer/triggers'
 export { useTrigger } from './trigger-composer/use-trigger'
 export type {
   TriggerSlot,
@@ -24,3 +22,13 @@ export type {
   TriggerEditorAPI,
 } from './trigger-composer/apply-select-result'
 export type { CharMatchConfig } from './trigger/match'
+
+export { EntityNode, createEntity, $isEntityNode } from './entity/entity-node'
+export type { SerializedEntity } from './entity/entity-node'
+
+export { useSubmit, registerSubmit } from './plugins/submit-plugin'
+export type { SubmitOptions } from './plugins/submit-plugin'
+
+export { serializeEditorState } from './serializer/serialize'
+export type { SubmitPayload, Entity, ImagePayload, FilePayload } from './serializer/types'
+export { SUBMIT_COMMAND } from './commands'

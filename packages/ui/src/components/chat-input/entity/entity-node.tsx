@@ -144,3 +144,8 @@ export function createEntity<D, N extends EntityNode<D>>(
 ): N {
   return $applyNodeReplacement(new Ctor(data))
 }
+
+/** True for any EntityNode subclass — the serializer uses this to find chips. */
+export function $isEntityNode(node: LexicalNode | null | undefined): node is EntityNode {
+  return node instanceof EntityNode
+}

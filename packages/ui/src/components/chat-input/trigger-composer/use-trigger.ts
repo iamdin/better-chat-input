@@ -1,5 +1,4 @@
 import { useEffect, type ReactNode } from 'react'
-import { useTagRenderer } from '../tag/use-tag-renderer'
 import type { PendingSelect, SelectResult } from './apply-select-result'
 import { type CascadeLevel, useTriggerComposerContext } from './context'
 
@@ -31,6 +30,13 @@ export interface UseTriggerConfig<T> {
   /** Display order among sources sharing the char. */
   order?: number
   /**
+   * Per-char match rules, declared right next to the source they belong to
+   * (there is no central charConfig). Shared across all sources of the char —
+   * the first trigger of a char to declare these wins (spec §4.6).
+   */
+  stopOnWhitespace?: boolean
+  pattern?: RegExp
+  /**
    * Provide this trigger's candidates. The hook calls it with the live
    * (query, active), so you can run `useQuery({ enabled: active })` keyed on
    * `query` right here — this resolves the chicken-and-egg between "what's the
@@ -40,14 +46,6 @@ export interface UseTriggerConfig<T> {
    */
   useItems?: (query: string, active: boolean) => TriggerItems<T>
   renderItem?: (item: T) => ReactNode
-  /**
-   * Register this plugin's tag appearance here too, so the trigger, its source,
-   * and its rendered tag are all declared in one place (assembled by the single
-   * TriggerComposer). `tagType` is the tag this plugin produces; `renderTag(data)`
-   * draws the inserted pill (distinct from `renderItem`, which draws the menu row).
-   */
-  tagType?: string
-  renderTag?: (data: Record<string, unknown>) => ReactNode
   /** Leaf action for a flat source. Omit when the source is a cascade. */
   onSelect?: (item: T) => SelectResult | PendingSelect
   /**
@@ -58,17 +56,20 @@ export interface UseTriggerConfig<T> {
 }
 
 /**
- * The single hook a trigger plugin uses (spec §4.4). It does three things at
- * once, which used to be two hooks (useTriggerSlot + useTriggerSource):
- * 1. subscribes to the engine and returns `{ active, query, select, close }`;
- * 2. calls `useItems(query, active)` to fetch/derive candidates — the bridge
- *    that lets the items depend on the query without a separate hook;
- * 3. registers + reactively patches the source into the merged menu.
+ * The single hook a trigger plugin uses (spec §4.4). It (1) subscribes to the
+ * engine and returns `{ active, query, select, close }`; (2) calls
+ * `useItems(query, active)` to fetch/derive candidates — the bridge that lets the
+ * items depend on the query without a separate hook; (3) registers + reactively
+ * patches the source (and its per-char match rule) into the merged menu.
  *
  * Static identity (id/char/order) registers once with teardown; reactive content
- * (items/loading/renderItem/onSelect/getChildren) is pushed every render. Pass
- * `kind: 'custom'` (and omit `useItems`) for an escape-hatch plugin: the engine
- * yields its menu + keyboard so the plugin can draw its own UI.
+ * (items/loading/renderItem/onSelect/getChildren/match) is pushed every render.
+ * Pass `kind: 'custom'` (and omit `useItems`) for an escape-hatch plugin: the
+ * engine yields its menu + keyboard so the plugin can draw its own UI.
+ *
+ * The inserted node is produced by `onSelect`/`getChildren` returning a
+ * `{ toNode }` SelectResult — i.e. the consuming app's own EntityNode subclass.
+ * The trigger no longer owns rendering; the node's `decorate()` does.
  */
 export function useTrigger<T = unknown>(config: UseTriggerConfig<T>): TriggerSlot {
   const engine = useTriggerComposerContext()
@@ -77,15 +78,18 @@ export function useTrigger<T = unknown>(config: UseTriggerConfig<T>): TriggerSlo
   const active = engine.activeChar === char
   const query = active ? engine.query : ''
 
-  // Co-locate the tag renderer (no-op unless tagType + renderTag are given).
-  useTagRenderer(config.tagType, config.renderTag)
-
   // Static identity — registers once, removes on unmount.
   useEffect(() => engine.register(id, char, order), [engine, id, char, order])
 
   // Candidates resolved through the caller's hook (always called → rules of
   // hooks hold; a given plugin always provides or always omits `useItems`).
   const resolved = config.useItems?.(query, active)
+
+  // Per-char match rule, if this trigger declares one.
+  const match =
+    config.stopOnWhitespace !== undefined || config.pattern !== undefined
+      ? { stopOnWhitespace: config.stopOnWhitespace, pattern: config.pattern }
+      : undefined
 
   // Reactive content — pushed each render; the engine bumps only its own menu
   // state, so this does not re-render other plugins.
@@ -94,6 +98,7 @@ export function useTrigger<T = unknown>(config: UseTriggerConfig<T>): TriggerSlo
       group: config.group,
       order,
       kind: config.kind,
+      match,
       items: (resolved?.items ?? []) as unknown[],
       loading: resolved?.loading,
       error: resolved?.error,

@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import type { PendingSelect, SelectResult } from './apply-select-result'
+import type { CharMatchConfig } from '../trigger/match'
 
 /**
  * One level of an engine-driven cascade (spec §4.11, declarative variant). A
@@ -29,6 +30,9 @@ export interface RegisteredSource {
   order?: number
   /** 'menu' joins the merged menu (default); 'custom' draws its own UI (spec §4.11). */
   kind?: 'menu' | 'custom'
+  /** Per-char match rule (stopOnWhitespace / pattern), declared on the trigger that
+   * owns this char. Shared across all sources of the char — first one wins (§4.6). */
+  match?: CharMatchConfig
   items: unknown[]
   loading?: boolean
   error?: unknown
