@@ -30,7 +30,7 @@ Start the daemon Chrome per the **use-agent-browser** skill, then follow this.
 | `mention-group` | a group heading (flat source's `group`) |
 | `mention-item` | a candidate row (`data-active="true"` = highlighted; trailing `›` = cascade branch) |
 | `mention-breadcrumb` | shown only when drilled into a cascade level |
-| `tag-pill` | a rendered TagNode in the editor (mention or `command`) |
+| `tag-pill` | a rendered EntityNode in the editor (mention or `command`) |
 | `payload` | submitted `SubmitPayload` JSON |
 
 ## Two rules that prevent false results
@@ -115,8 +115,8 @@ agent-browser eval "JSON.stringify({active:document.querySelector('[data-active=
 
 ### Slash commands (separate `/` char, command tag, start-anchored)
 ```bash
-# '/' is its own trigger char with a start-anchored pattern (charConfig
-# { '/': { pattern: /^\/([^/\s]*)$/u } }) — fires ONLY at the line start. Like a
+# '/' is its own trigger char with a start-anchored pattern (the SlashCommands
+# trigger declares pattern: /^\/([^/\s]*)$/u) — fires ONLY at the line start. Like a
 # mention, confirming a command drops a tag — but a lighter, background-less one.
 agent-browser keyboard type "/" ; agent-browser wait 400
 agent-browser eval "JSON.stringify({groups:[...document.querySelectorAll('[data-testid=mention-group]')].map(g=>g.textContent),items:[...document.querySelectorAll('[data-testid=mention-item]')].map(i=>i.textContent.trim())})"
@@ -128,7 +128,7 @@ agent-browser eval "(()=>{const p=document.querySelector('[data-testid=tag-pill]
 # NOTE: submitting via a dispatched Enter while ANY tag (mention or command) is in
 # the editor is a known synthetic-event limitation — plain text submits, tag-present
 # does not. It is not a bug in the plugin; the command tag uses the same toNode path
-# as mentions, so its payload entity {tagType:'command', data:{name}} is by construction.
+# as mentions, so its payload entity {type:'command', data:{name}} is by construction.
 ```
 
 ### Custom escape-hatch (`kind:'custom'`)
