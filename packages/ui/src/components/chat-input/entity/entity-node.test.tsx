@@ -128,6 +128,40 @@ describe('EntityNode', () => {
     )
   })
 
+  test('importDOM declines a span whose payload is malformed (degrades to text)', () => {
+    const editor = editorWith()
+    editor.update(
+      () => {
+        const map = UserNode.importDOM()
+        // Right type, but the data attr is missing / not JSON / not an object.
+        for (const bad of ['', '{not json', 'null', '42', '"a string"']) {
+          const el = document.createElement('span')
+          el.setAttribute('data-lexical-entity-type', 'user')
+          if (bad) el.setAttribute('data-lexical-entity', bad)
+          el.textContent = '@Alice'
+          expect(map.span?.(el)).toBeNull()
+        }
+      },
+      { discrete: true },
+    )
+  })
+
+  test('stored data is deeply frozen — cannot be mutated outside a Lexical update', () => {
+    const editor = editorWith()
+    editor.update(
+      () => {
+        const node = $createUserNode({ id: 'u1', name: 'Alice' })
+        const data = node.getData()
+        expect(Object.isFrozen(data)).toBe(true)
+        expect(() => {
+          ;(data as { name: string }).name = 'Mallory'
+        }).toThrow()
+        expect(node.getData().name).toBe('Alice')
+      },
+      { discrete: true },
+    )
+  })
+
   test('the node is an atomic inline segment', () => {
     const editor = editorWith()
     editor.update(

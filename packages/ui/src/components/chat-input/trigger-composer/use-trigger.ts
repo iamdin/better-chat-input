@@ -78,8 +78,12 @@ export function useTrigger<T = unknown>(config: UseTriggerConfig<T>): TriggerSlo
   const active = engine.activeChar === char
   const query = active ? engine.query : ''
 
-  // Static identity — registers once, removes on unmount.
-  useEffect(() => engine.register(id, char, order), [engine, id, char, order])
+  // Static identity — registers once, removes on unmount. Depend on the stable
+  // `engine.register` callback, NOT the whole `engine` object: `engine` is a memo
+  // keyed on activeChar/query, so it changes every keystroke and would otherwise
+  // tear down and re-register every source on each character typed.
+  const { register } = engine
+  useEffect(() => register(id, char, order), [register, id, char, order])
 
   // Candidates resolved through the caller's hook (always called → rules of
   // hooks hold; a given plugin always provides or always omits `useItems`).

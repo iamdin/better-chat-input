@@ -20,15 +20,31 @@ export type SerializedEntity<D> = Spread<{ data: D }, SerializedLexicalNode>
 const ENTITY_TYPE_ATTR = 'data-lexical-entity-type'
 const ENTITY_DATA_ATTR = 'data-lexical-entity'
 
-function readEntityData(el: HTMLElement): Record<string, unknown> {
+/** Parse the embedded payload, or `null` if it is missing / malformed / not an
+ * object — so importDOM can decline the span and let it degrade to plain text
+ * instead of minting a typed node with undefined fields. */
+function readEntityData(el: HTMLElement): Record<string, unknown> | null {
   const raw = el.getAttribute(ENTITY_DATA_ATTR)
-  if (!raw) return {}
+  if (!raw) return null
   try {
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
   } catch {
-    return {}
+    return null
   }
+}
+
+/** Recursively freeze entity data so a node's payload can't be mutated outside a
+ * Lexical update (which would corrupt history snapshots and shared clones). Data
+ * is JSON-like by contract, so a structural freeze is sufficient and total. */
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const key of Object.keys(value)) {
+      deepFreeze((value as Record<string, unknown>)[key])
+    }
+    Object.freeze(value)
+  }
+  return value
 }
 
 /**
@@ -46,7 +62,7 @@ export abstract class EntityNode<D = Record<string, unknown>> extends DecoratorN
 
   constructor(data: D, key?: NodeKey) {
     super(key)
-    this.__data = data
+    this.__data = deepFreeze(data)
   }
 
   getData(): D {
@@ -102,8 +118,12 @@ export abstract class EntityNode<D = Record<string, unknown>> extends DecoratorN
     return {
       span: (el: HTMLElement) => {
         if (el.getAttribute(ENTITY_TYPE_ATTR) !== type) return null
+        const data = readEntityData(el)
+        // Malformed payload: decline the span so it falls back to plain text
+        // (its readable textContent) rather than a typed node with holes.
+        if (data === null) return null
         return {
-          conversion: (node: HTMLElement) => ({ node: create(readEntityData(node)) }),
+          conversion: () => ({ node: create(data) }),
           priority: 1,
         }
       },
